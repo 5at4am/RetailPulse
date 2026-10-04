@@ -49,3 +49,9 @@ models/*/encoder.pkl
 
 # Data-quality reports that are large logs rather than deliverables.
 *.log
+
+# The Evidently self-contained HTML bundle is ~4 MB and regenerable from the raw panel
+# with `python -m src.drift`. Its two small CSV companions stay committed, because they are
+# the numbers quoted in the report.
+reports/drift/*.html
+reports/drift/_probe.html
