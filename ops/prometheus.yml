@@ -1,0 +1,53 @@
+# RetailPulse — Prometheus scrape config.
+#
+# Tier 3: authored, not deployed. Prometheus needs a cluster, which the submission window did
+# not have. This file is the scrape definition that would run against the Deployment in
+# `deploy/kubernetes/dashboard.yaml`.
+#
+# The important detail is that Streamlit does not expose Prometheus metrics on its own. Its
+# `/_stcore/metrics` endpoint returns a placeholder, so scraping it produces no series. The
+# real numbers come from a streamlit-prometheus sidecar or a Prometheus streamlit exporter
+# wrapped around the app. That is why the target below is the exporter port, not 8501, and
+# why the pod annotation in the manifest is a placeholder that would be replaced once an
+# exporter is wired in. Claiming working metrics without the exporter would be a lie in a
+# config file.
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  # Out-of-order and duplicate samples come from two scrapers overlapping during a rollout.
+  # Tolerating them beats page noise at 3am.
+  scrape_timeout: 10s
+  external_labels:
+    monitor: retailpulse
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Streamlit itself. Kept because it is the liveness signal, but see the note above: this
+  # target alone will not produce application metrics.
+  - job_name: retailpulse-dashboard
+    metrics_path: /_stcore/metrics
+    static_configs:
+      - targets: ["retailpulse-dashboard.retailpulse.svc.cluster.local:8501"]
+        labels:
+          component: dashboard
+
+  # Where the real series come from, once the exporter is deployed.
+  - job_name: retailpulse-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["retailpulse-exporter.retailpulse.svc.cluster.local:9709"]
+        labels:
+          component: exporter
+    metric_relabel_configs:
+      # Drop per-session series. A demo with 30 open tabs must not create 30 distinct
+      # time series, which is how a Prometheus instance runs out of memory.
+      - source_labels: [session_id]
+        regex: ".+"
+        action: drop
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

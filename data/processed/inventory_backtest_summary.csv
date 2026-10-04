@@ -1,0 +1,2 @@
+baseline,holdout_weeks,baseline_error_units,policy_error_units,error_reduction_pct,baseline_overstock_units,policy_overstock_units,baseline_understock_units,policy_understock_units,meets_25_40_target,note
+naive_mean,13,20700.5,20267.8,2.09,18301.9,44.0,2398.7,20223.8,False,"Reduction is measured against the naive-mean policy on the same forecast. It is a walk-forward replay on historical data, not a production A/B result."

@@ -1,0 +1,67 @@
+# RetailPulse — full-stack image for the NIGHTLY PIPELINE.
+#
+# Deliberately separate from the dashboard `Dockerfile`. That image installs
+# requirements-dashboard.txt (streamlit, pandas, plotly) because the app only reads committed
+# aggregates from data/processed/ and never imports a model. Baking Prophet, TensorFlow and
+# XGBoost into it would be ~2 GB for a page that plots four CSVs.
+#
+# The pipeline is the opposite case: every stage fits a model, so it needs the full dependency
+# set. Pointing the pipeline CronJob at the dashboard image was a real defect -- each stage died
+# on `import prophet` before running a single line. Hence two images:
+#
+#   retailpulse:<sha>          dashboard / Streamlit, light
+#   retailpulse-pipeline:<sha> nightly refresh, full ML stack
+#
+#   docker build -f Dockerfile.pipeline -t retailpulse-pipeline:1.0.0 .
+#   docker run --rm -v "$PWD/data:/app/data" retailpulse-pipeline:1.0.0
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HOME=/home/appuser
+
+# Prophet needs a C++ toolchain to build cmdstan's binary at install time; without build-essential
+# the install fails on a machine with no wheel for the platform. The compilers are removed in the
+# same layer so they do not ship in the final image.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential \
+      g++ \
+      make \
+      libgomp1 \
+      curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# --------------------------------------------------------------------------- dependencies
+COPY requirements.txt ./
+
+# Prophet first and on its own: it is the slowest and the most fragile install, so a failure
+# surfaces here rather than after a multi-minute TensorFlow download.
+RUN pip install --no-cache-dir "prophet>=1.1.5" \
+ && pip install --no-cache-dir -r requirements.txt
+
+# ------------------------------------------------------------------------------- app
+# The pipeline imports src.* and runs src.pipeline, which subprocesses `python -m src.<stage>`,
+# so the whole package has to be present -- not just the modules the orchestrator imports.
+COPY src/ ./src/
+COPY app/ ./app/
+COPY data/processed/ ./data/processed/
+
+RUN useradd --create-home --uid 10001 appuser \
+ && mkdir -p /app/data \
+ && chown -R appuser:appuser /app
+USER appuser
+
+# A stage that hangs should be killed by the orchestrator's activeDeadlineSeconds, not hold the
+# container open forever. This is a coarse backstop for `docker run` without a deadline.
+HEALTHCHECK --interval=5m --timeout=30s --start-period=5m --retries=1 \
+  CMD pgrep -f "src.pipeline" > /dev/null || exit 1
+
+# `src.pipeline` runs the stages in order and stops at the first failure, so the sequence lives
+# in tested code rather than in the shape of this image or a Kubernetes manifest. Override with
+# `--only` to run a subset, e.g. `docker run ... retailpulse-pipeline python -m src.pipeline --only churn`.
+CMD ["python", "-m", "src.pipeline"]

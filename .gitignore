@@ -5,6 +5,7 @@
 data/raw/
 *.csv
 !data/processed/*.csv
+!reports/drift/*.csv
 
 # Python
 __pycache__/
@@ -50,8 +51,12 @@ models/*/encoder.pkl
 # Data-quality reports that are large logs rather than deliverables.
 *.log
 
-# The Evidently self-contained HTML bundle is ~4 MB and regenerable from the raw panel
-# with `python -m src.drift`. Its two small CSV companions stay committed, because they are
-# the numbers quoted in the report.
-reports/drift/*.html
+# Drift evidence stays committed, including the Evidently bundle.
+#
+# This was previously ignored as "~4 MB and regenerable". Both halves of that are wrong here.
+# `data/raw/` is ignored, so a fresh clone cannot re-run `python -m src.drift` at all without
+# first regenerating the 104 MB raw panel -- so the artefact is not actually regenerable by the
+# person reviewing it. And these are deliverables, not logs: reports/RetailPulse_Report.md
+# quotes drift_summary.csv, tests/test_figures.py reads it, and reports/demo_video_outline.md
+# tells the evaluator to open evidently_drift.html on screen.
 reports/drift/_probe.html

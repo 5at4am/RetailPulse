@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 from src import config
-from src.forecasting import (MIN_OBSERVATIONS, SEASON_LENGTH, EnsembleFixed,
+from src.forecasting import (MIN_OBSERVATIONS, SCORE_COLUMNS, SEASON_LENGTH, EnsembleFixed,
                              LSTMPooled, ProphetPooled, RidgeSeasonal, SeasonalNaiveModel,
                              backtest_pooled, build_series, evaluate_all, reconcile,
                              seasonal_naive, series_weights)
@@ -257,8 +257,9 @@ def test_evaluate_all_returns_the_same_columns_even_when_everything_fails():
     too_short = build_series(make_panel(weeks=40), level="total")
     scores = evaluate_all(too_short, horizons=(1, 2), run_prophet=False, run_lstm=False,
                           progress=lambda *_: None)
-    assert list(scores.columns) == ["horizon", "model", "wape", "mape_nonzero", "mae",
-                                    "bias", "actual_total", "predicted_total", "error"]
+    # Compared against SCORE_COLUMNS rather than a hardcoded list, so adding a metric to the
+    # table cannot leave this test asserting a shape the pipeline no longer produces.
+    assert list(scores.columns) == list(SCORE_COLUMNS)
     assert scores["wape"].isna().all()
     assert scores["error"].notna().all()
 

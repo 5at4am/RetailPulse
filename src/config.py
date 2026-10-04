@@ -94,6 +94,11 @@ HORIZONS = (1, 2, 4)
 PRIMARY_HORIZON = 4
 INVENTORY_HORIZON = 1
 
+# MASE needs a denominator: the in-sample error of a naive forecast. On a weekly series with
+# an annual cycle, 52 is the meaningful choice -- a random-walk denominator (seasonality=1)
+# would flatter every model, because the seasonal-naive error is large on this data.
+MASE_SEASONALITY = 52
+
 # 77.9% of panel rows have units_sold == 0, so plain MAPE is undefined there. WAPE is the
 # primary metric; MAPE is reported on the non-zero subset only, with the subset stated.
 MAPE_ZERO_SUBSET = "y_true > 0"
@@ -104,6 +109,11 @@ CHURN_AUC_TARGET = 0.88
 CHURN_PRECISION_AT_K = 0.20          # precision among the top 20% highest-risk
 CHURN_PRECISION_TARGET = 0.75        # the brief's floor for that precision
 CHURN_LABEL_WINDOW_DAYS = 90          # no purchase in the next 90 days = churned
+SHAP_LOCAL_TOP_N = 25                 # customers given per-customer explanations
+# Reasons published per customer. Six of the ten features: ranks 7-10 in the real output
+# sit around 1e-3 log-odds, which is noise, and printing them turns "why is this customer
+# flagged" into a reprint of the global importance table.
+SHAP_LOCAL_REASONS = 6
 SNAPSHOT_START = "2025-01-31"
 SNAPSHOT_END = "2025-09-30"
 SNAPSHOT_STRIDE_DAYS = 30             # one label set per month

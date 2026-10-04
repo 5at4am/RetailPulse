@@ -1,2 +1,2 @@
-n_train,n_test,train_base_rate,test_base_rate,auc,precision_at_top,recall_at_top,lift_at_top,k,target_precision,meets_target
-40588,21659,0.4317,0.4247,0.7315,0.7703,0.3628,1.8137,0.2,0.75,True
+n_train,n_test,train_base_rate,test_base_rate,auc,pr_auc,f1_at_operating_threshold,operating_threshold,tn,fp,fn,tp,precision_at_top,recall_at_top,lift_at_top,k,target_precision,meets_target,meets_auc_target
+40588,21659,0.4317,0.4247,0.7315,0.6845,0.4941,0.7051869630813599,11458,1002,5852,3347,0.7703,0.3628,1.8137,0.2,0.75,True,False

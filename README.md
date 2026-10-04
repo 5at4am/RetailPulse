@@ -21,7 +21,7 @@ recommendations for a 970,998-line retail panel, plus a Streamlit dashboard.
 pip install -r requirements.txt
 python generate_retail_pulse.py     # raw data, seeded, not committed
 python -m src.precompute            # aggregates the dashboard reads
-python -m pytest tests/ -q          # 305 tests
+python -m pytest tests/ -q          # 471 tests
 ```
 
 ## Running the dashboard
@@ -30,17 +30,26 @@ python -m pytest tests/ -q          # 305 tests
 streamlit run app/Home.py
 ```
 
-Pages read only `data/processed/`. The raw panel is 63 MB and costs 10-20 seconds
-per session against an 8-second budget, so a test fails the build if any page
-touches it. Aggregates load in about 0.1s.
+Pages read only `data/processed/`. The raw inputs are 103.7 MB in total
+(`retail_pulse_demand_panel.csv` 60.4 MB, `retail_pulse_sales.csv` 43.3 MB) and cost
+10-20 seconds per session against an 8-second budget, so a test fails the build if
+any page touches them. Aggregates load in about 0.1s.
 
-Run an individual stage:
+Run an individual stage, or the whole nightly chain:
 
 ```bash
 python -m src.forecasting
 python -m src.inventory
 python -m src.drift
+
+python -m src.pipeline                  # all stages, in order, stop at first failure
+python -m src.pipeline --only churn     # a subset
 ```
+
+`src.pipeline` is the single definition of the stage order and of which artefacts
+each stage must leave behind. The Airflow DAG and the Kubernetes CronJob both import
+that list rather than restating it, and `tests/test_pipeline.py` checks the manifests
+against it.
 
 ## Results
 
@@ -79,7 +88,7 @@ app/            Streamlit pages + cached data loader
 data/processed/ committed aggregates (the dashboard's only input)
 data/raw/       generated, gitignored
 src/            one module per stage
-tests/          305 tests
+tests/          471 tests
 reports/        report, drift artefacts, figures
 DAILY_LOG.md    dated log of decisions and verification runs
 ```

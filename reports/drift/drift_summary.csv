@@ -1,0 +1,10 @@
+column,kind,psi,reference_mean,current_mean,reference_median,current_median,verdict,largest_mover,largest_mover_shift
+units_sold,numerical,0.0003,1.0103,1.0509,0.0,0.0,stable,,
+revenue,numerical,0.0005,167.9876,181.4129,0.0,0.0,stable,,
+avg_unit_price,numerical,0.0006,40.3038,43.1547,0.0,0.0,stable,,
+avg_discount_pct,numerical,0.0,0.4923,0.4231,0.0,0.0,stable,,
+stockout_count,numerical,0.0,0.01,0.0105,0.0,0.0,stable,,
+on_hand_end,numerical,0.0005,10.6995,10.6442,12.0,12.0,stable,,
+product_category,categorical,0.0,,,,,stable,Grocery,0.0
+is_promo_week,categorical,0.0024,,,,,stable,1,0.0024
+region,categorical,0.0,,,,,stable,South,0.0

@@ -1,0 +1,85 @@
+# RetailPulse — nightly pipeline as a Kubernetes CronJob.
+#
+# Tier 3: authored and statically validated, not deployed.
+#
+# Why this job exists even though the aggregates are committed: a committed artefact is a
+# snapshot of one moment. A nightly refresh is what turns the forecast and the reorder plan
+# into something an operations team can rely on, and what makes the drift report meaningful,
+# since drift can only be detected against data that is actually arriving.
+#
+# SEQUENCING LIVES IN src/pipeline.py, NOT IN THIS FILE.
+#
+# The first draft listed all six steps as six containers in one Pod. That looks like a
+# pipeline and is not one: Kubernetes starts every container in a Pod concurrently, so
+# `verify` ran at t=0 against artefacts that did not exist yet and reported a spurious
+# failure, while a container exiting non-zero did not stop the steps running beside it. There
+# is no "run after" relationship between containers, only between init containers (all of
+# which must complete before the app containers start, which is the wrong shape for a
+# step-that-should-fail-the-job) and between separate Jobs (which need an orchestrator to
+# chain them -- that is what airflow/dags/retailpulse_nightly.py is for).
+#
+# So this manifest is one container calling `python -m src.pipeline`, which runs the stages in
+# order, checks each stage left its artefacts behind, and stops at the first failure. The
+# ordering and the stop-on-failure behaviour are unit-tested in tests/test_pipeline.py.
+#
+# The cost of one container is that every stage shares the pod's resource envelope, set below
+# from the largest stage (forecasting). Per-stage limits are declared in STAGE_RESOURCES in
+# src/pipeline.py for the Airflow path, where each stage gets its own pod.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: retailpulse-nightly
+  namespace: retailpulse
+  labels:
+    app.kubernetes.io/name: retailpulse
+    app.kubernetes.io/component: pipeline
+spec:
+  schedule: "17 3 * * *"          # 03:17 UTC. Deliberately not :00 -- every cluster-wide
+                                  # cron lands on the hour and this one queues behind them.
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid      # never let two runs write the same output
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 14     # failures are what get investigated, so keep more of them
+  startingDeadlineSeconds: 3600
+  suspend: false
+  jobTemplate:
+    spec:
+      backoffLimit: 1             # src.pipeline already stops at the first bad stage; retrying
+                                   # the whole chain twice just burns the nightly window.
+      activeDeadlineSeconds: 3600 # hard stop. A hung Prophet fit must not occupy a slot
+                                   # forever; the next night's run is the retry.
+      ttlSecondsAfterFinished: 604800
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: retailpulse
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            fsGroup: 10001
+          containers:
+            - name: pipeline
+              # NOT retailpulse:1.0.0. That tag is the dashboard image, built from
+              # requirements-dashboard.txt, which deliberately omits Prophet, TensorFlow,
+              # XGBoost and LightGBM -- the app reads committed aggregates and never imports
+              # them. Pointing the pipeline at that tag makes every stage fail on import.
+              # This is the full-stack image built from requirements.txt.
+              image: retailpulse-pipeline:1.0.0
+              command: ["python", "-m", "src.pipeline"]
+              env:
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              resources:
+                # Sized for the forecasting stage, the heaviest one. `src.pipeline` runs all
+                # stages in this one container, so they share the envelope.
+                requests: {cpu: "1000m", memory: "6Gi"}
+                limits: {memory: "10Gi"}
+              volumeMounts:
+                - name: work
+                  mountPath: /app/data
+          volumes:
+            - name: work
+              persistentVolumeClaim:
+                claimName: retailpulse-data

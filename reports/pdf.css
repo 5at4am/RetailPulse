@@ -1,0 +1,138 @@
+/* Print stylesheet for the RetailPulse report PDF.
+ *
+ * Chrome renders this; pandoc only produces the HTML skeleton. Sized for A4 with a readable
+ * measure (~78 characters) because a report is read, not skimmed, and full-width lines on A4
+ * are genuinely hard to track back to the next one.
+ */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+  /* Printed page numbers, bottom outside. `counter(page)` is a CSS Paged Media feature Chrome
+     supports in print-to-PDF. */
+  @bottom-center {
+    content: "RetailPulse — " counter(page) " / " counter(pages);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 8pt;
+    color: #7b8794;
+  }
+}
+
+html {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  color: #1f2933;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 78ch;
+  padding: 0;
+  /* Orphans/widows keep a heading from being stranded at the page foot. Chrome honours these. */
+  orphans: 3;
+  widows: 3;
+}
+
+h1 {
+  font-size: 20pt;
+  line-height: 1.2;
+  margin: 0 0 6mm;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid #2b6cb0;
+  color: #1f2933;
+}
+
+h2 {
+  font-size: 13pt;
+  margin: 7mm 0 2.5mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #d7dce2;
+  /* page-break-after: avoid stops a heading landing alone at the top of a page with its
+   * section overleaf. Chrome does not support `break-after: avoid` in older engines, so both. */
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 10.5pt;
+  margin: 5mm 0 2mm;
+  color: #2b6cb0;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+p { margin: 0 0 2.4mm; }
+
+/* Keep a table with its caption/intro paragraph where possible; never split a single row. */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 2.5mm 0 4mm;
+  font-size: 8.8pt;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+th, td {
+  border: 1px solid #d7dce2;
+  padding: 1.4mm 2mm;
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  background: #f0f4f8;
+  font-weight: 600;
+}
+
+/* Zebra striping, because a full-width 4-column table of numbers is hard to track across
+   without it. */
+tbody tr:nth-child(even) { background: #fafbfc; }
+
+code {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.92em;
+  background: #f0f4f8;
+  padding: 0.3mm 1mm;
+  border-radius: 2px;
+}
+
+pre {
+  background: #f7f9fb;
+  border: 1px solid #e4e7eb;
+  padding: 2.5mm;
+  font-size: 8pt;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+pre code { background: none; padding: 0; }
+
+blockquote {
+  margin: 2.5mm 0;
+  padding-left: 3mm;
+  border-left: 3px solid #2b6cb0;
+  color: #3e4c59;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 3mm auto 4mm;
+  /* A figure split across a page boundary reads as a broken chart. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid #e4e7eb;
+  margin: 5mm 0;
+}
+
+a { color: #2b6cb0; text-decoration: none; }
+
+/* Bold and italic inside table cells need slightly more contrast at 8.8pt. */
+strong { font-weight: 650; }

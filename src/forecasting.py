@@ -302,6 +302,9 @@ def backtest_pooled(series, horizon, model_factory, min_history=MIN_OBSERVATIONS
         "actual": actual,
         "predicted": np.asarray(predicted, dtype=float),
         "model": model,
+        # The in-sample series MASE divides by. Without it MASE cannot be computed, and MASE
+        # is the only scale-free accuracy measure in the brief's metric list.
+        "insample": train["units"].to_numpy(dtype=float),
     }
 
 
@@ -346,8 +349,8 @@ def series_weights(panel, level="store"):
     return (totals / totals.sum()).sort_values(ascending=False)
 
 
-SCORE_COLUMNS = ["horizon", "model", "wape", "mape_nonzero", "mae", "bias",
-                  "actual_total", "predicted_total", "error"]
+SCORE_COLUMNS = ["horizon", "model", "wape", "mape_nonzero", "mae", "rmse", "mase",
+                  "bias", "actual_total", "predicted_total", "error"]
 
 
 def evaluate_all(series, horizons=config.HORIZONS, run_prophet=True, run_lstm=True,
@@ -382,15 +385,22 @@ def evaluate_all(series, horizons=config.HORIZONS, run_prophet=True, run_lstm=Tr
                 continue
 
             predicted = outcome["predicted"]
-            metrics = forecast_metrics(actual, predicted)
+            # seasonality=52 matches a weekly series with an annual cycle, so the MASE
+            # denominator is a seasonal-naive error rather than a random-walk one. The brief
+            # lists MASE without saying which, and the choice changes the number, so it is
+            # named here and in the report.
+            metrics = forecast_metrics(actual, predicted, insample=outcome["insample"],
+                                       seasonality=config.MASE_SEASONALITY)
             results.append({"horizon": horizon, "model": name,
                             "wape": metrics["wape"],
                             "mape_nonzero": metrics["mape_nonzero"],
-                            "mae": metrics["mae"], "bias": metrics["bias"],
+                            "mae": metrics["mae"], "rmse": metrics["rmse"],
+                            "mase": metrics["mase"], "bias": metrics["bias"],
                             "actual_total": float(actual.sum()),
                             "predicted_total": float(predicted.sum())})
             progress(f"    WAPE {metrics['wape']:.4f}   "
-                     f"MAPE(nonzero) {metrics['mape_nonzero']:.4f}")
+                     f"MAPE(nonzero) {metrics['mape_nonzero']:.4f}   "
+                     f"RMSE {metrics['rmse']:.1f}   MASE {metrics['mase']:.3f}")
 
     return pd.DataFrame(results).reindex(columns=SCORE_COLUMNS)
 

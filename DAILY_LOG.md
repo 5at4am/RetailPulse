@@ -548,4 +548,145 @@ silencing the category, so a DeprecationWarning from our own code still fails th
 ### Next
 
 - Live Streamlit Cloud deployment needs the participant's own accounts; not done here.
-- Nothing else outstanding. F-01 through F-07 are implemented, tested and committed.
+
+## 2026-10-04 (late) - Audit pass: Tier-3 correctness and honest numbers
+
+### The CronJob did not sequence anything
+
+`deploy/kubernetes/pipeline-cronjob.yaml` listed all six stages as six containers in one Pod,
+with a comment claiming drift ran "after the models" and another claiming the `verify` container
+would "stop the pod". **Neither was true.** Kubernetes starts every container in a Pod
+concurrently, so `verify` ran at t=0 against artefacts that did not exist yet, and a container
+exiting non-zero did not stop the stages beside it.
+
+Sequencing moved into `src/pipeline.py` as `STAGES`, `STAGE_OUTPUTS` and `run_pipeline()`, and
+the YAML became one container calling `python -m src.pipeline`. The Airflow DAG imports the same
+list. The order is now asserted in `tests/test_pipeline.py`.
+
+What made this survivable to review is that two of the original tests asserted the broken shape:
+`test_cronjob_runs_drift_after_the_models` checked the index of `drift` among container names,
+which passes perfectly while the ordering means nothing. A test can pin a bug in place as
+happily as a fix. Those two tests were rewritten, not satisfied.
+
+### The duplicated filename lists were lying
+
+The pipeline contract, the CronJob's shell loop and the DAG's `VERIFY` each listed expected
+outputs by hand. They disagreed: the contract required `drift_report.csv` from a module that has
+always written `drift_summary.csv`, into a directory that does not exist (`drift` writes to
+`reports/drift/`), and required `kpis.csv` from `precompute`, which writes `kpis` as a dict key
+rather than a `.csv` literal. Now there is one list and `tests/test_pipeline.py` reads the
+filenames back out of each module to check the contract against the code.
+
+### The pipeline pointed at an image nobody built
+
+The CronJob ran `retailpulse:1.0.0` — the **dashboard** image, built from
+`requirements-dashboard.txt`, which deliberately omits Prophet, TensorFlow and XGBoost. Every
+stage would have died on `import prophet`. Fixed by adding `Dockerfile.pipeline` for the full ML
+stack and pointing the CronJob at `retailpulse-pipeline`. `tests/test_pipeline.py` now fails if a
+manifest references an image with no Dockerfile to build it.
+
+### Docker would not have built
+
+`COPY src/dashboard_data.py ./src/ 2>/dev/null || true` — `COPY` is not a shell, so that is a
+parse error, and the file it named does not exist (the module is `app/dashboard_data.py`,
+already carried by `COPY app/`). The build failed twice over. `tests/test_tier3.py` now rejects
+shell syntax in any `COPY` and checks that every `COPY` source exists in the build context.
+
+### `_matrix.csv` was not stray debris
+
+`data/processed/_matrix.csv` looked like a leftover debug dump and I deleted it. It came back on
+the next `precompute` run. The cause: `_`-prefixed keys in precompute's `out` dict are internal by
+convention, and the write loop ignored that convention. `_concentration` is a float so the
+`isinstance(DataFrame)` check happened to skip it; `_matrix` is a DataFrame, so it did not get
+that protection. Deleting the file treated the symptom. The write loop now honours the prefix,
+and there is a test asserting `data/processed/` holds no internal artefacts — the dashboard
+auto-loads everything in that directory.
+
+### The churn matrix did not reproduce from the published scores
+
+`churn_metrics.csv` called 4,349 cases at its operating threshold; re-applying that threshold to
+the published `churn_scores.csv` called 4,309. Cause: XGBoost returns float32. Comparing a float32
+array against a float64 threshold makes NumPy cast the threshold *down* to float32, so ~40 scores
+tied with the cutoff were included in memory; written to CSV as float64 and read back, the
+comparison happened in float64 and the cutoff's low bits excluded them. `src/churn.py` now has one
+`scores_of()` helper that widens to float64 once, used by the metric path and the write path.
+
+The second churn failure was my own test: the fixture used six invented feature names while the
+project has ten. A fixture with its own column list passes even if `local_explanations` zips the
+wrong label onto every contribution, because there is nothing to misalign against.
+
+### MASE: a passing-looking test that proved nothing
+
+Pinning "seasonal naive scores MASE = 1" took three attempts, and the first two were wrong in
+instructive ways. A strictly 52-periodic series has *zero* in-sample naive error, so `mase`
+returns NaN and any perturbed version divides one ~1e-14 float-noise term by another — a
+meaningless 1.055. The working version uses a linear series where every lag-52 step is exactly
++104, so numerator and denominator are the same constant and the ratio is 1 to the last bit.
+
+Also worth recording: `metrics.bias` is `mean(actual - pred)`, so **positive means
+over-forecast**. The obvious sign convention is the opposite one, and the docstring says so.
+
+### The inventory target is not met, and the report did not say so
+
+The walk-forward backtest measures a **2.09%** error reduction against a 25–40% target. The report
+had no section on it at all. The decomposition is more informative than the number: overstock
+collapses from 18,301.9 to 44.0 units while understock rises from 2,398.7 to 20,223.8. The policy
+is not reducing total error, it is moving the error from one side of the ledger to the other.
+
+Related: the 0.9928 critical ratio implies a **99.28% service level (z = 2.449)**, above the 95%
+in `config.py`. The report had claimed the ratio was "derived from the 95% service level". It is
+derived from the cost economics; the 95% does not drive the shipped quantity. Flagged in the
+report as a decision for the brief's owner rather than quietly re-tuned.
+
+### Corrected facts
+
+| Claimed | Actually |
+|---|---|
+| 276 / 305 tests passing | 455 |
+| Dec and Jan peaks in 7 of 9 categories | 10 categories; peak months are Oct (4), May/Jun (3), Nov (1). **No December or January peak.** |
+| Raw panel 63 MB | 103.7 MB total; demand panel 60.4 MB |
+| Drift compares first vs second half of the period | Compares **2024 vs 2025** |
+| Critical ratio derived from the 95% service level | Derived from cost economics; implies 99.28% |
+
+### Report figures and PDF
+
+`src/figures.py` draws all six figures from the committed CSVs rather than from hard-coded
+numbers, so a chart cannot drift away from the table beside it. Two of them exist because the
+report was making a claim without showing it: the WAPE-by-horizon matrix makes the Prophet /
+seasonal-naive inversion visible, and the inventory chart shows overstock and understock
+swapping places instead of the error bar shrinking.
+
+PDF is `pandoc` (markdown to HTML) then Chrome headless `--print-to-pdf`, with
+`reports/pdf.css` for A4 sizing and print rules. Result: **10 pages, 0.53 MB, 6 embedded
+images** — inside the brief's 10-18 page and 12 MB budgets. `tests/test_figures.py` asserts the
+page count and size, so a report that grows past 18 pages fails the suite rather than being
+discovered at submission.
+
+### An encoding bug I caused and then made worse
+
+Inserting the figure references with a PowerShell `Get-Content -Raw` / `Set-Content -Encoding
+UTF8` round-trip corrupted the file: PowerShell 5.1 reads without a BOM using the ANSI codepage,
+so every em dash and curly quote in the file became mojibake. My first repair attempt then
+re-encoded the whole text through CP1252, which turned the mojibake back into real characters
+but destroyed the eleven that CP1252 cannot represent (`−`, `≥`), replacing them with U+FFFD. A
+blanket encoding fix on a file with mixed provenance is worse than the original bug.
+
+Repair was per-line with explicit intended text, then verified: zero U+FFFD, zero mojibake, zero
+stray backslashes. The backslash check was not paranoia — `` \`region` `` had lost its `r`
+entirely, because `\r` is a carriage return, so the table row silently read `| egion\ |`.
+
+Lesson recorded because it will recur: **do not round-trip UTF-8 through PowerShell 5.1 cmdlets**
+in this repo. Use the editor tools, which are encoding-safe.
+
+### Verification
+
+- `python -m pytest tests/ -q` → **471 passed**, 2 warnings, both from `shap`'s own colormap code.
+- `python -m src.pipeline`'s artefact check → no stage missing an output.
+- `precompute`, `inventory`, `churn`, `drift` re-run against the fixed code.
+- Docker, `kubectl` and Airflow are unavailable here, so the manifests are statically and
+  unit-validated only. The build and deploy jobs in `ci.yml` are `if: false` for that reason.
+
+### Next
+
+- Live deployment, remote push and the participant's git identity still need real credentials.
+- Final prose needs participant review; the brief disqualifies AI-generated submissions.

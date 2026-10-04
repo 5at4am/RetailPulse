@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>RetailPulse - Project Report</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="pdf.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">RetailPulse - Project Report</h1>
+</header>
+<h1 id="retailpulse--project-report">RetailPulse — Project Report</h1>
+<p><strong>Dataset:</strong> <code>retail_sales.csv</code> +
+<code>store_product_matrix.csv</code> — 970,998 line items, 8,000
+customers, 1,200 products, 50 stores, 2024-01-01 to 2025-12-31 (104
+complete weeks). <strong>Stack:</strong> Python 3.11+, pandas,
+scikit-learn, XGBoost, Prophet, TensorFlow/Keras, Evidently, Streamlit.
+<strong>Tests:</strong> 455 passing.</p>
+<hr />
+<h2 id="1-what-the-data-turned-out-to-be">1. What the data turned out to
+be</h2>
+<p>The first job was measurement, not modelling. Four facts from the
+data changed how everything downstream was built:</p>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Value</th>
+<th>Consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Panel sparsity</td>
+<td><strong>77.9%</strong> of store-product-weeks have zero demand</td>
+<td>MAPE is unusable. A single zero makes the error infinite, so any
+series with a zero week must be excluded — and excluding them discards
+most of the panel. WAPE is the primary forecast metric.</td>
+</tr>
+<tr>
+<td>Promotions do not move volume</td>
+<td>volume lift <strong>0.9999x</strong> vs 1.56x configured</td>
+<td>Promoted lines carry a 26.0% discount and realise
+<strong>0.6931x</strong> the revenue per unit. The configured lift
+appears nowhere in the data.</td>
+</tr>
+<tr>
+<td>Weekly seasonality, but not a December one</td>
+<td>Peak month is <strong>October in 4 of 10 categories</strong>,
+May/June in 3, November in 1. <strong>No category peaks in December or
+January.</strong></td>
+<td>A 4-week horizon crosses a month boundary, which is why
+seasonal-naive beats the neural nets at 2 and 4 weeks. It is not a
+holiday boundary, and an earlier draft of this report claimed December
+peaks that the data does not contain.</td>
+</tr>
+<tr>
+<td>Snapshots repeat customers</td>
+<td>8,000 customers appear in 24 monthly snapshots</td>
+<td>A random train/test split puts near-duplicate rows on both sides and
+inflates churn AUC. The split must be temporal.</td>
+</tr>
+</tbody>
+</table>
+<p>The sparsity number is the one that shaped the architecture. It is
+why the dashboard reads precomputed aggregates rather than the 63 MB raw
+panel, why forecast accuracy is reported as WAPE, and why inventory
+safety stock is computed from a Poisson quantile rather than a normal
+approximation.</p>
+<h2 id="2-feature-engineering-and-leakage-control">2. Feature
+engineering and leakage control</h2>
+<p>Ten behavioural features per customer as of each snapshot date:
+recency, frequency, monetary, average basket value, units per line,
+category diversity, promotion share, mean discount, online share,
+tenure. Every feature is computed with an <code>as_of</code> cutoff and
+<code>src/features.py</code> exposes <code>assert_no_leakage()</code>,
+which is exercised by <code>tests/test_no_leakage.py</code>. A feature
+that reads past its own snapshot date fails the suite rather than
+silently flattering the model.</p>
+<p>The churn label is "did not purchase in the following 30 days",
+computed only for customers whose 30-day window is fully inside the
+data. Customers near the end of the series are dropped rather than
+assumed active.</p>
+<h2 id="3-customer-segmentation-f-02">3. Customer segmentation
+(F-02)</h2>
+<p><img src="figures/fig4_segments.png"
+alt="Segment revenue share vs customer share" /></p>
+<p>K-Means on the 10 standardised features, silhouette swept over the
+brief's 2–10 range.</p>
+<ul>
+<li><strong>k=6 selected, silhouette 0.1998.</strong> Raw best was k=5
+at 0.2021 — a gap of 0.0023, which is noise at n=8,000. k=6 was kept
+because it sits inside the requested range and separates high-value from
+dormant customers more cleanly.</li>
+<li><strong>DBSCAN as a cross-check found 2 clusters with 38.1%
+noise.</strong> Reporting this plainly: DBSCAN did not produce a usable
+alternative segmentation on this data.</li>
+<li><strong>Segments</strong> are named from centroid medians, and the
+medians are shown next to each name so the naming can be judged rather
+than trusted.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Segment</th>
+<th>Customers</th>
+<th>Median recency (d)</th>
+<th>Median freq</th>
+<th>Median monetary</th>
+<th>Total revenue</th>
+<th>Online share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Champions</td>
+<td>2,020</td>
+<td>32.0</td>
+<td>14.0</td>
+<td>36,260.57</td>
+<td>83,739,221.68</td>
+<td>0.083</td>
+</tr>
+<tr>
+<td>At risk loyal</td>
+<td>774</td>
+<td>105.0</td>
+<td>4.0</td>
+<td>64,714.52</td>
+<td>59,650,576.27</td>
+<td>0.144</td>
+</tr>
+<tr>
+<td>At risk (in-store, monetary high)</td>
+<td>2,536</td>
+<td>66.0</td>
+<td>4.0</td>
+<td>8,713.80</td>
+<td>26,889,981.06</td>
+<td>0.013</td>
+</tr>
+<tr>
+<td>Occasional buyers</td>
+<td>1,289</td>
+<td>56.0</td>
+<td>7.0</td>
+<td>15,513.48</td>
+<td>23,810,032.05</td>
+<td>0.679</td>
+</tr>
+<tr>
+<td>Dormant</td>
+<td>839</td>
+<td>524.0</td>
+<td>2.0</td>
+<td>8,245.80</td>
+<td>9,665,064.73</td>
+<td>0.108</td>
+</tr>
+<tr>
+<td>At risk (promo-driven, monetary highest)</td>
+<td>542</td>
+<td>88.5</td>
+<td>3.0</td>
+<td>8,391.90</td>
+<td>6,487,748.56</td>
+<td>0.121</td>
+</tr>
+</tbody>
+</table>
+<p>The "At risk loyal" group is the one worth arguing about: 774
+customers hold the <strong>highest median monetary value in the entire
+segmentation</strong> (64,714.52, nearly double Champions) but buy only
+four times. A revenue-based rule would call them the best customers in
+the business, and they are also the ones most likely to lapse. The name
+says both halves of that, which is why the naming is derived from the
+medians rather than assigned by hand.</p>
+<p>The silhouette near 0.20 means the clusters overlap substantially.
+The segments are a useful summary for targeting, not sharply separated
+populations.</p>
+<h2 id="4-demand-forecasting-f-03">4. Demand forecasting (F-03)</h2>
+<p><img src="figures/fig1_forecast.png"
+alt="Pooled weekly demand and the 4-week forecast" /></p>
+<p>Five candidates were backtested at three horizons: seasonal naive,
+ridge with seasonal features, Prophet, an LSTM, and a naive/Prophet
+ensemble.</p>
+<table>
+<thead>
+<tr>
+<th>Horizon</th>
+<th>Winner</th>
+<th>WAPE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 week</td>
+<td>Prophet</td>
+<td><strong>0.006829</strong></td>
+</tr>
+<tr>
+<td>2 weeks</td>
+<td>seasonal naive</td>
+<td><strong>0.021336</strong></td>
+</tr>
+<tr>
+<td>4 weeks</td>
+<td>seasonal naive</td>
+<td><strong>0.038349</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The complete WAPE matrix, so the selection can be checked rather than
+taken on trust:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>h=1</th>
+<th>h=2</th>
+<th>h=4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>seasonal naive</strong></td>
+<td>0.021041</td>
+<td><strong>0.021336</strong></td>
+<td><strong>0.038349</strong></td>
+</tr>
+<tr>
+<td><strong>ridge + seasonal dummies</strong></td>
+<td>0.055511</td>
+<td>0.035383</td>
+<td>0.038592</td>
+</tr>
+<tr>
+<td><strong>Prophet</strong></td>
+<td><strong>0.006829</strong></td>
+<td>0.073035</td>
+<td>0.112415</td>
+</tr>
+<tr>
+<td><strong>naive/Prophet ensemble</strong></td>
+<td>0.007106</td>
+<td>0.036930</td>
+<td>0.067545</td>
+</tr>
+<tr>
+<td><strong>LSTM</strong></td>
+<td>0.059988</td>
+<td>0.113050</td>
+<td>0.241546</td>
+</tr>
+</tbody>
+</table>
+<p>No model failed to fit; all fifteen horizon/model combinations
+produced a score. The ordering inverts between h=1 and h=2, and that
+inversion is the substantive result. Prophet's weekly profile is learned
+well enough to beat a 52-week seasonal lag by 3x over one week, and then
+degrades faster than the lag does over two. A model that wins only at
+the horizon where the most data supports it, and loses everywhere else,
+is not a model to build a plan on.</p>
+<p>RMSE and MASE are published alongside WAPE in
+<code>forecast_backtest.csv</code> for every combination, since the
+brief asks for both. MASE uses a <strong>seasonality of 52</strong> (a
+seasonal-naive denominator on a weekly annual series); the choice is
+named explicitly because it materially changes the number. on this data
+a random-walk denominator would report the same forecasts as far
+worse.</p>
+<p>The 4-week path matters most because the brief's "30-day ahead" is 4
+weeks on a weekly panel. Inventory consumes h=1 only, where Prophet's
+advantage is largest.</p>
+<p><img src="figures/fig2_model_comparison.png"
+alt="Backtest WAPE by horizon" /></p>
+<p>Two things worth stating plainly:</p>
+<p><strong>Forecasting is pooled.</strong> The models fit the weekly
+total and apportion it to store-product series by historical share.
+Fitting 7,500 independent Prophet series cannot meet the batch budget.
+The accuracy figures above describe the pooled total.</p>
+<p><strong>Those figures are not the brief's MAPE target.</strong> The
+brief asks for MAPE under 12% at the panel level. The pooled total has
+no zero-demand weeks, so its MAPE filter excludes nothing and its MAPE
+(0.0068) is not evidence about the sparse panel level. Reporting 0.68%
+as "well under 12%" would be a category error. The 4-week pooled WAPE of
+3.8% is the number I stand behind.</p>
+<p>Store-level forecasts are reconciled so the parts sum exactly to the
+pooled total.</p>
+<h2 id="5-churn-prediction-f-04">5. Churn prediction (F-04)</h2>
+<p>XGBoost on a <strong>temporal</strong> split: 40,588 training
+snapshots, 21,659 test snapshots, with every snapshot for a given date
+on the same side of the split.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Result</th>
+<th>Target</th>
+<th>Met</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Precision @ top 20%</td>
+<td><strong>0.7703</strong></td>
+<td>0.75</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Lift @ top 20%</td>
+<td><strong>1.8137</strong></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Recall @ top 20%</td>
+<td>0.3628</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>AUC</strong></td>
+<td><strong>0.7315</strong></td>
+<td>0.88</td>
+<td><strong>no</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The AUC target was not met, by 0.15.</strong> Precision at
+the top of the ranking did meet its target. I am not going to average
+those two facts into a single "good performance" sentence: precision
+says the top 20% of the list is worth working, and AUC says the model
+does not order the rest of the population well. On 8,000 customers with
+a 42% churn base rate, that is the trade-off the target set asked for,
+and the list is usable for a campaign while the scores are not usable
+for probability thresholds.</p>
+<p>For completeness, the rest of the published metrics, which are what
+the dashboard's confusion matrix and threshold slider are reading, and
+every one of them reproduces exactly from
+<code>churn_scores.csv</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ROC-AUC</td>
+<td>0.7315</td>
+</tr>
+<tr>
+<td>PR-AUC</td>
+<td>0.6845</td>
+</tr>
+<tr>
+<td>Operating threshold</td>
+<td>0.705187</td>
+</tr>
+<tr>
+<td>F1 at that threshold</td>
+<td>0.4941</td>
+</tr>
+<tr>
+<td>Confusion (tn / fp / fn / tp)</td>
+<td>11,458 / 1,002 / 5,852 / 3,347</td>
+</tr>
+<tr>
+<td>Train / test snapshots</td>
+<td>40,588 / 21,659</td>
+</tr>
+<tr>
+<td>Train / test base rate</td>
+<td>0.4317 / 0.4247</td>
+</tr>
+</tbody>
+</table>
+<p>That last row is the reason the split is sound: the churn rate is
+essentially unchanged across the split boundary, so the model is not
+being scored on a different population than it was trained on. It is
+worth stating because a temporal split that <em>did</em> shift the base
+rate would make the AUC gap below look like a distribution problem
+rather than a modelling one.</p>
+<p>SHAP importance: <code>recency_days</code> 0.524,
+<code>frequency</code> 0.228, <code>tenure_days</code> 0.089,
+<code>avg_basket_value</code> 0.088. Recency dominating is expected, and
+its size is the honest signal that the model is largely measuring "have
+they stopped showing up".</p>
+<p><img src="figures/fig3_shap.png"
+alt="Global churn feature importance" /></p>
+<p>Local explanations are published per customer in
+<code>churn_shap_local.csv</code>: the 25 highest-risk customers, six
+strongest features each, in <strong>log-odds</strong> units, where
+<code>sum(contributions) + expected_value == logit(predict_proba)</code>.
+A one-week push moves the log-odds by the summed contribution, not by
+<code>predicted - actual</code> in probability space. Stating that
+distinction matters, because the two give different numbers for the same
+explanation.</p>
+<h2 id="6-inventory-recommendations-f-05">6. Inventory recommendations
+(F-05)</h2>
+<p>Newsvendor reorder quantity per store-product pair, on a 1-week lead
+time.</p>
+<p>Cost assumptions, stated because they drive every number below:
+purchase cost 60% of retail, annual holding 25%, lost margin 40%.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Pairs</th>
+<th>Units</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Poisson quantile (shipped)</strong></td>
+<td><strong>496</strong></td>
+<td><strong>2,081</strong></td>
+<td><strong>INR 48,771</strong></td>
+</tr>
+<tr>
+<td>Normal approx (comparison only)</td>
+<td>1,518</td>
+<td>7,465</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The Poisson quantile uses a <strong>0.9928 critical ratio</strong>.
+That number comes from the cost economics, not from the service-level
+setting:</p>
+<pre><code>critical ratio = lost_margin / (lost_margin + holding)
+               = 0.40        / (0.40 + 0.60 x 0.25 / 52)
+               = 0.99284</code></pre>
+<p>It implies a <strong>99.28% service level (z = 2.449)</strong>, which
+is <em>higher</em> than the 95% configured in <code>config.py</code>.
+That is worth flagging rather than glossing: a critical ratio above the
+requested service level means the assumed cost structure says stockouts
+are far more expensive than carrying inventory, so the newsvendor
+optimum over-serves relative to the 95% target. The 95% is recorded in
+the output as a separate, labelled figure; it does not drive the shipped
+quantity. An earlier draft of this report claimed the ratio was "derived
+from the 95% service level" — it is not, and those two numbers should
+not be conflated.</p>
+<p>The normal approximation orders <strong>5,384 more units</strong>
+across 1,022 more pairs. That gap is the finding, not a nuisance: with
+77.9% of weeks at zero demand, mean + z·std has no probabilistic meaning
+in the upper tail. The normal version is kept in the output as a
+labelled comparison so the difference is visible.</p>
+<p><img src="figures/fig6_inventory.png"
+alt="Inventory backtest decomposition" /></p>
+<h3 id="61-walk-forward-backtest--the-target-was-not-met">6.1
+Walk-forward backtest — the target was not met</h3>
+<p>The brief asks for a <strong>25–40% reduction in inventory
+error</strong>. Measured over the last 13 weeks against a naive-mean
+policy on the same forecast, the reduction is
+<strong>2.09%</strong>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Baseline (naive mean)</th>
+<th>Newsvendor policy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Error (units)</td>
+<td>20,700.5</td>
+<td>20,267.8</td>
+</tr>
+<tr>
+<td>Overstock (units)</td>
+<td>18,301.9</td>
+<td><strong>44.0</strong></td>
+</tr>
+<tr>
+<td>Understock (units)</td>
+<td>2,398.7</td>
+<td><strong>20,223.8</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>This misses the 25–40% target, and the decomposition is more
+informative than the headline.</strong> The policy almost eliminates
+overstock (18,301.9 → 44.0 units) and pays for it almost one-for-one in
+understock (2,398.7 → 20,223.8 units). Total error barely moves because
+it is measuring symmetric absolute units, and the policy has swapped
+which side of the ledger absorbs the miss.</p>
+<p>Two honest caveats on this number:</p>
+<ul>
+<li>It is a <strong>walk-forward replay on historical data</strong>, not
+a production A/B result. It measures what the rule would have done,
+holding the forecast fixed.</li>
+<li>The baseline is deliberately weak. A naive-mean policy has no
+reorder logic at all, so the comparison flatters any real policy; a
+seasonal-naive or newsvendor baseline would be a harder test and would
+likely show a smaller gap.</li>
+</ul>
+<p>The overstock collapse points at the likely cause: a 99.28% critical
+ratio applied to a Poisson demand distribution with very low mean demand
+produces small order quantities, because the Poisson quantile at 99.28%
+is not far above the mean when the mean is small. This is a calibration
+question worth raising with the brief's owner rather than tuning away
+silently.</p>
+<h2 id="7-dashboard-f-06">7. Dashboard (F-06)</h2>
+<p>Five Streamlit pages — overview, demand forecasting, customer
+segments, churn risk, inventory recommendations.</p>
+<p>All pages read <strong>only</strong> <code>data/processed/</code>. A
+test spies on <code>pandas.read_csv</code> and fails if any page touches
+<code>data/raw/</code>, because the raw panel costs 10–20 seconds per
+session against an 8-second budget. Aggregates load in
+<strong>0.09s</strong>.</p>
+<h2 id="8-data-drift-monitoring">8. Data drift monitoring</h2>
+<p><img src="figures/fig5_drift.png" alt="Drift PSI per column" /></p>
+<p><code>src/drift.py</code> compares the <strong>first and second year
+(2024 vs 2025)</strong> across volume, price, discount and category mix,
+using PSI and TVD, and writes <code>drift_summary.csv</code>,
+<code>category_mix_drift.csv</code> and an Evidently HTML report to
+<code>reports/drift/</code>.</p>
+<p><strong>Result: no column drifted.</strong> Every column returned PSI
+&lt; 0.1, the "stable" band:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Kind</th>
+<th>PSI</th>
+<th>2024 mean</th>
+<th>2025 mean</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>avg_discount_pct</code></td>
+<td>numerical</td>
+<td>0.0000</td>
+<td>0.4923</td>
+<td>0.4231</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>product_category</code></td>
+<td>categorical</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td>categorical</td>
+<td>0.0000</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>units_sold</code></td>
+<td>numerical</td>
+<td>0.0003</td>
+<td>1.0103</td>
+<td>1.0509</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>on_hand_end</code></td>
+<td>numerical</td>
+<td>0.0005</td>
+<td>10.6995</td>
+<td>10.6442</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>revenue</code></td>
+<td>numerical</td>
+<td>0.0005</td>
+<td>167.9876</td>
+<td>181.4129</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>avg_unit_price</code></td>
+<td>numerical</td>
+<td>0.0006</td>
+<td>40.3038</td>
+<td>43.1547</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>is_promo_week</code></td>
+<td>categorical</td>
+<td>0.0024</td>
+<td>n/a</td>
+<td>n/a</td>
+<td>stable</td>
+</tr>
+<tr>
+<td><code>stockout_count</code></td>
+<td>numerical</td>
+<td>0.0000</td>
+<td>0.0100</td>
+<td>0.0105</td>
+<td>stable</td>
+</tr>
+</tbody>
+</table>
+<p>Thresholds: PSI &lt; 0.1 stable, 0.1 to 0.2 moderate, &gt;= 0.2
+significant.</p>
+<p>Two things about this table are worth not glossing over. First, the
+largest PSI on any column is <strong>0.0024</strong>, three orders of
+magnitude below the alert boundary, which is what a stationary generator
+produces. Second, the means do move (revenue 167.99 ? 181.41, roughly 8%
+growth) while PSI stays near zero. That is not a contradiction: PSI
+compares <em>distributions</em>, and a uniform 8% level shift across a
+stationary shape barely changes the histogram. So this report can say
+"no distributional drift" and must not also say "nothing changed".</p>
+<h2 id="9-deployment-orchestration-and-monitoring-tier-3">9. Deployment,
+orchestration and monitoring (Tier 3)</h2>
+<p><strong>Authored and statically validated. Not deployed.</strong>
+There is no cluster, no container registry and no Airflow scheduler
+behind this submission, so every claim in this section is about the
+files being correct, not about them having run in production. The
+<code>ci.yml</code> build and deploy jobs are <code>if: false</code> for
+exactly that reason.</p>
+<h3 id="two-images-because-one-cannot-serve-both-jobs">Two images,
+because one cannot serve both jobs</h3>
+<table>
+<thead>
+<tr>
+<th>Image</th>
+<th>Dockerfile</th>
+<th>Dependencies</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>retailpulse</code></td>
+<td><code>Dockerfile</code></td>
+<td><code>requirements-dashboard.txt</code></td>
+<td>Streamlit app; reads committed aggregates only</td>
+</tr>
+<tr>
+<td><code>retailpulse-pipeline</code></td>
+<td><code>Dockerfile.pipeline</code></td>
+<td><code>requirements.txt</code></td>
+<td>Nightly refresh; fits Prophet/TensorFlow/XGBoost</td>
+</tr>
+</tbody>
+</table>
+<p>Keeping them apart is a deliberate size decision. The dashboard image
+installs only streamlit, pandas and plotly, because the app never
+imports a model — baking a 2 GB ML stack into it is how a demo URL stops
+responding. The pipeline image installs the full stack, and needs
+<code>build-essential</code> because Prophet compiles its Stan binary at
+install time.</p>
+<p>This split was not in the first draft: the pipeline CronJob pointed
+at the <strong>dashboard</strong> image, so every stage would have died
+on <code>import prophet</code>. A test now fails if any manifest
+references an image with no Dockerfile to build it.</p>
+<h3 id="sequencing-lives-in-code-not-in-manifest-shape">Sequencing lives
+in code, not in manifest shape</h3>
+<p><code>src/pipeline.py</code> defines the stage order and the artefact
+each stage must produce:</p>
+<pre><code>precompute -&gt; forecasting -&gt; churn -&gt; inventory -&gt; drift</code></pre>
+<p>The Kubernetes CronJob and the Airflow DAG both
+<strong>import</strong> that list rather than restating it. This matters
+more than it sounds: the first CronJob declared all six stages as six
+containers in a single Pod, which <em>looks</em> like a pipeline in YAML
+and is not one — Kubernetes starts every container in a Pod
+concurrently, so the verification step ran at t=0 against files that did
+not exist, and a container exiting non-zero did not stop the stages
+beside it. Two of the original tests asserted that broken ordering and
+passed happily, because they checked the index of <code>drift</code>
+among container names, which is a true statement about a list that means
+nothing.</p>
+<p>The same duplication produced a quieter bug: the contract required
+<code>drift_report.csv</code> from a module that has always written
+<code>drift_summary.csv</code>, into <code>data/processed/</code> when
+drift actually writes to <code>reports/drift/</code>.
+<code>tests/test_pipeline.py</code> now reads the filenames back out of
+each module and checks the contract against the code.</p>
+<h3 id="deployment-artefacts">Deployment artefacts</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Dockerfile</code></td>
+<td>Dashboard image, non-root, Streamlit healthcheck on
+<code>/_stcore/health</code></td>
+</tr>
+<tr>
+<td><code>Dockerfile.pipeline</code></td>
+<td>Full-stack image for the nightly refresh</td>
+</tr>
+<tr>
+<td><code>deploy/kubernetes/dashboard.yaml</code></td>
+<td>Deployment + Service, non-root, all capabilities dropped</td>
+</tr>
+<tr>
+<td><code>deploy/kubernetes/pipeline-cronjob.yaml</code></td>
+<td>Nightly chain at 03:17 UTC,
+<code>concurrencyPolicy: Forbid</code></td>
+</tr>
+<tr>
+<td><code>airflow/dags/retailpulse_nightly.py</code></td>
+<td>Same chain as a DAG; importable without Airflow installed</td>
+</tr>
+<tr>
+<td><code>.github/workflows/ci.yml</code></td>
+<td>Schema check, unit tests, dashboard load budget, image builds</td>
+</tr>
+<tr>
+<td><code>ops/prometheus.yml</code>,
+<code>ops/grafana-dashboard.json</code></td>
+<td>Pipeline and model monitoring</td>
+</tr>
+</tbody>
+</table>
+<p>The CronJob fires at 03:17 rather than 03:00 because every
+cluster-wide cron lands on the hour, and
+<code>concurrencyPolicy: Forbid</code> prevents two runs writing the
+same CSVs.</p>
+<p><strong>What is not verified here:</strong> no
+<code>docker build</code>, no <code>kubectl apply</code>, no Airflow
+scheduler. The manifests are parsed and unit-asserted; that catches
+shape and reference errors, which is most of what went wrong above, but
+not a runtime or cluster-permission fault.</p>
+<h2 id="10-how-the-numbers-in-this-report-are-verified">10. How the
+numbers in this report are verified</h2>
+<p>The report is written from the CSVs in <code>data/processed/</code>,
+never from memory, and the test suite is where that claim gets checked
+rather than asserted:</p>
+<ul>
+<li><strong>Published metrics reproduce from published inputs.</strong>
+The churn confusion matrix is recomputed from
+<code>churn_scores.csv</code> at the published threshold and must match
+exactly. This check found a real defect: XGBoost returns float32, and
+comparing a float32 array against a float64 threshold made NumPy cast
+the threshold <em>down</em>, including ~40 tied rows in memory that the
+CSV round-trip then excluded. The two published artefacts disagreed by
+40 customers.</li>
+<li><strong>Artefacts contain what they claim.</strong>
+<code>src.pipeline</code> fails a stage that exits 0 without writing its
+declared outputs, and treats a zero-byte or header-only CSV as
+missing.</li>
+<li><strong>Leakage is checked, not assumed.</strong>
+<code>src/features.py</code> exposes <code>assert_no_leakage()</code>
+and <code>tests/test_no_leakage.py</code> fails the build if any feature
+reads past its own snapshot date.</li>
+<li><strong>The dashboard cannot read raw data.</strong> A spy on
+<code>pandas.read_csv</code> fails the build if any page touches
+<code>data/raw/</code>, because the raw inputs are 103.7 MB against an
+8-second budget.</li>
+<li><strong>A metric definition is pinned.</strong> The MASE suite
+includes the assertion that a seasonal-naive forecast scores exactly
+1.0, which is how the seasonality choice becomes checkable.</li>
+</ul>
+<h2 id="11-limitations">11. Limitations</h2>
+<ol type="1">
+<li><strong>Churn AUC is 0.7315 against a 0.88 target.</strong> The
+largest gap in this project.</li>
+<li><strong>The forecast MAPE target is not demonstrated at the panel
+level.</strong> The 0.68% figure is pooled and excludes zero-demand
+weeks by construction.</li>
+<li><strong>The inventory reduction target is not met: 2.09% against
+25–40%.</strong> The policy trades overstock for understock rather than
+reducing total error. See §6.1.</li>
+<li><strong>Silhouette 0.1998 means overlapping segments.</strong> The
+six groups are a targeting summary, not distinct populations.</li>
+<li><strong>Promotion findings are associational.</strong> Promotions
+are targeted, not randomised. The 0.9999x volume lift is an association
+between promoted and unpromoted lines, not a causal estimate, and the
+26% discount could itself be selecting for lines that would have sold
+anyway.</li>
+<li><strong>LSTM underperforms seasonal naive at every horizon.</strong>
+Reported rather than dropped. With ~104 weekly observations and strong
+fixed seasonality, there is not enough signal for the sequential model
+to beat a seasonal lag.</li>
+<li><strong>The critical ratio implies a 99.28% service level, not the
+configured 95%.</strong> The cost assumptions drive it above the target.
+This needs a decision from the brief's owner, not a silent re-tune.</li>
+<li><strong>Store-level forecasts are shares, not independent
+fits.</strong> A store with a genuine local trend will be smoothed
+toward the pooled total.</li>
+<li><strong>No drift was detected, which is weak evidence.</strong> The
+comparison is 2024 vs 2025 on a seeded synthetic generator whose
+anomalies were written in by hand.</li>
+<li><strong>Data is synthetic.</strong> The generator is seeded, so the
+anomalies are the ones that were written in. These conclusions do not
+transfer to a real retail panel without revalidation.</li>
+</ol>
+</body>
+</html>

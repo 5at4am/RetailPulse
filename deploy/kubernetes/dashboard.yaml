@@ -1,0 +1,164 @@
+# RetailPulse — Streamlit dashboard deployment.
+#
+# Tier 3: authored and statically validated with `kubectl --dry-run=client`, not deployed to
+# a live cluster within the submission window. Streamlit Community Cloud served the public
+# demo. That distinction is stated in the report and must stay accurate.
+#
+# The scheduled jobs here are the real operational value of the manifest: forecasts, reorder
+# plans and the drift report have to be regenerated on a cadence or they are stale artefacts
+# being presented as current.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: retailpulse
+  labels:
+    app.kubernetes.io/name: retailpulse
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: retailpulse
+  namespace: retailpulse
+  labels:
+    app.kubernetes.io/name: retailpulse
+# No Role and no RoleBinding are attached. The pipeline writes CSVs and serves them; it does
+# not touch the Kubernetes API. Granting namespace access would be privilege without a
+# requirement.
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retailpulse-dashboard
+  namespace: retailpulse
+  labels:
+    app.kubernetes.io/name: retailpulse
+    app.kubernetes.io/component: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: retailpulse
+      app.kubernetes.io/component: dashboard
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: retailpulse
+        app.kubernetes.io/component: dashboard
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8501"
+        prometheus.io/path: "/_stcore/metrics"
+    spec:
+      serviceAccountName: retailpulse
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dashboard
+          image: retailpulse:1.0.0
+          # digest-pinned in a real deployment. A floating tag means the pod that passed
+          # staging is not necessarily the pod that is serving.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8501
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              # No CPU limit on purpose. Streamlit's initial data load is short and bursty;
+            # a cpu limit throttles it past the 8s cold-start budget for no real saving.
+              memory: "1Gi"
+          # The manifest already declares the HEALTHCHECK in the Dockerfile, so it is
+          # inherited rather than restated. Duplicating it in two places is how they drift.
+          startupProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            failureThreshold: 20
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: retailpulse-dashboard
+  namespace: retailpulse
+  labels:
+    app.kubernetes.io/name: retailpulse
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: retailpulse
+    app.kubernetes.io/component: dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: retailpulse-dashboard
+  namespace: retailpulse
+spec:
+  # Two replicas, so a node drain can take one without dropping the demo.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: retailpulse
+      app.kubernetes.io/component: dashboard
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: retailpulse-dashboard
+  namespace: retailpulse
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: retailpulse-dashboard
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Long stabilisation: the dashboard is idle between demos, so without this it scales to
+      # zero on a lunch break and has to cold-start when someone opens the link.
+      stabilizationWindowSeconds: 600

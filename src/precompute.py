@@ -309,10 +309,23 @@ def build_all(write=True, run_segmentation=True, segmentation=None):
 
     if write:
         config.ensure_dirs()
+        # `_`-prefixed keys are internal by convention -- `_matrix` is the raw store-product
+        # frame kept for the concentration calculation, not a published aggregate. The write
+        # loop used to ignore that convention and emit `_matrix.csv` (a 27 kB file with no
+        # header) into data/processed, which the dashboard auto-loads. `_concentration` is a
+        # float so the isinstance check already skipped it; `_matrix` is a DataFrame, so it did
+        # not get that protection. Skipping the prefix handles both without special-casing.
+        skipped = sorted(n for n in out
+                         if isinstance(out[n], pd.DataFrame) and n.startswith("_"))
         for name, frame in out.items():
-            if isinstance(frame, pd.DataFrame):
-                frame.to_csv(config.PROCESSED / f"{name}.csv", index=False)
+            if name.startswith("_") or not isinstance(frame, pd.DataFrame):
+                continue
+            frame.to_csv(config.PROCESSED / f"{name}.csv", index=False)
+        # Published deliberately and under a readable name: the concentration table is a
+        # deliverable, `_matrix` is not.
         matrix.to_csv(config.PROCESSED / "store_product_matrix.csv")
+        if skipped:
+            print(f"  not published (internal): {', '.join(skipped)}")
 
     return out
 

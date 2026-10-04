@@ -1,6 +1,6 @@
 # Demo Video Outline — RetailPulse
 
-Target: **4 to 5 minutes.** One screen recording of the running dashboard, plus a voiceover
+Target: **5 minutes.** One screen recording of the running dashboard, plus a voiceover
 track. Every number below is already in `reports/RetailPulse_Report.md`, so if one is wrong
 in the video the report is the thing to fix first.
 
@@ -94,7 +94,7 @@ a demo that is trusted and one that is not.
 > "SHAP says recency dominates at 0.52, then frequency at 0.23. The model is largely
 > measuring whether people have stopped showing up."
 
-## 3:10 — Inventory (40s)
+## 3:10 — Inventory (50s)
 
 Navigation → Inventory Recommendations.
 
@@ -109,15 +109,49 @@ Expand the comparison:
 > ship that. With 78% zero weeks, mean plus z times sigma has no meaning in the upper tail,
 > so safety stock comes from a Poisson quantile."
 
-## 3:50 — Closing (30s)
+**Then the backtest, and do not skip it — this is the weakest number in the project:**
+
+> "Walk-forward over the last 13 weeks against a naive-mean baseline: a 2.09% reduction, against
+> a 25 to 40% target. We missed it. The interesting part is why — overstock drops from 18,302
+> units to 44, and understock rises from 2,399 to 20,224. The policy didn't reduce total error,
+> it moved the error from one side of the ledger to the other."
+
+> "One thing that needs a decision, not a re-tune: the cost assumptions give a 0.9928 critical
+> ratio, which implies a 99.28% service level. That's above the 95% we configured. It's a
+> calibration question for whoever owns the brief."
+
+## 4:00 — Drift (30s)
+
+The drift monitor is not a dashboard page. Show it as a terminal cutaway, not narrated over a
+chart.
+
+```bash
+python -m src.drift
+```
+
+> "We compare 2024 against 2025 — volume, price, discount and category mix — using PSI and
+> total variation distance. On this data nothing drifted; every column came back under the 0.1
+> stable threshold."
+
+**Then say why a clean result is weak evidence, because it is:**
+
+> "A monitor that never fires is either reassuring or broken. So the thresholds are exercised by
+> a synthetic injection test that forces a shift and confirms the PSI responds. The 2024-vs-2025
+> null result is real, but it isn't proof the detector works on your data."
+
+The Evidently HTML report is at `reports/drift/evidently_drift.html`.
+
+## 4:30 — Closing (30s)
 
 Back to Home.
 
-> "Six functional requirements, 305 tests, a dashboard that loads in about a tenth of a
-> second because it reads precomputed aggregates and never the 63 MB raw panel."
+> "Seven functional requirements, 471 tests, a dashboard that loads in about a tenth of a
+> second because it reads precomputed aggregates and never the 103 MB of raw inputs."
 
-> "Three targets were missed and they're in the report: churn AUC, the panel-level MAPE
-> definition, and the silhouette. Everything here is reproducible from the seeded generator."
+> "Four targets were missed, and they're in the report: churn AUC is 0.73 against 0.88, the
+> panel-level MAPE target isn't demonstrated because the forecast is pooled, the inventory
+> reduction is 2% against a 25% target, and the silhouette near 0.20 means the segments overlap.
+> Everything here is reproducible from the seeded generator."
 
 ---
 
@@ -127,6 +161,6 @@ Back to Home.
   about what was built and why.
 - If a number on screen disagrees with this outline, the screen is correct only if the report
   is also updated. Fix the report, then re-record.
-- Skip the DBSCAN and Evidently sections if time runs short. Do not skip the AUC miss.
-- The drift module is not a dashboard page; if asked, show `python -m src.drift` in a
-  terminal separately rather than trying to narrate it in the walkthrough.
+- Skip the DBSCAN segment if time runs short. **Do not skip the AUC miss, the inventory
+  backtest miss, or the drift segment** — those are the three places where volunteering the
+  weakness is what makes the rest of the demo credible.
