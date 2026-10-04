@@ -291,7 +291,7 @@ are `if: false` for exactly that reason.
 | Image | Dockerfile | Dependencies | For |
 |---|---|---|---|
 | `retailpulse` | `Dockerfile` | `requirements.txt` | Streamlit app; reads committed aggregates only |
-| `retailpulse-pipeline` | `Dockerfile.pipeline` | `requirements-ml.txt` | Nightly refresh; fits Prophet/TensorFlow/XGBoost |
+| `retailpulse-pipeline` | `Dockerfile.pipeline` | `ml-requirements.txt` | Nightly refresh; fits Prophet/TensorFlow/XGBoost |
 
 Keeping them apart is a deliberate size decision. The dashboard image installs only streamlit,
 pandas and plotly, because the app never imports a model — baking a 2 GB ML stack into it is how

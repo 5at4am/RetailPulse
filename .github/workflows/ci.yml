@@ -43,10 +43,10 @@ jobs:
           cache: pip
 
       - name: Install
-        # requirements-ml.txt, not the root requirements.txt: this job runs the whole non-slow
+        # ml-requirements.txt, not the root requirements.txt: this job runs the whole non-slow
         # suite, and the tests for F-03/F-04 import Prophet, XGBoost, SHAP and Evidently. The
         # root file is the lean app set so Streamlit Community Cloud can install three packages.
-        run: pip install -r requirements-ml.txt
+        run: pip install -r ml-requirements.txt
 
       - name: Aggregates are present and non-empty
         # This is the check that would have caught the missing segment-name column: the file
@@ -108,7 +108,7 @@ jobs:
 
       - name: Install
         # Full stack: this job regenerates the raw data and refits every model.
-        run: pip install -r requirements-ml.txt
+        run: pip install -r ml-requirements.txt
 
       - name: Regenerate the raw data
         # Seeded, so this is reproducible. Without it the job cannot test ingestion, because

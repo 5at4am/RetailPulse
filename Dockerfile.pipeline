@@ -42,12 +42,12 @@ WORKDIR /app
 # what Streamlit Community Cloud installs for the public demo, and it has no place in the image
 # that refits Prophet and trains the LSTM nightly.
 COPY requirements.txt ./
-COPY requirements-ml.txt ./
+COPY ml-requirements.txt ./
 
 # Prophet first and on its own: it is the slowest and the most fragile install, so a failure
 # surfaces here rather than after a multi-minute TensorFlow download.
 RUN pip install --no-cache-dir "prophet>=1.1.5" \
- && pip install --no-cache-dir -r requirements-ml.txt
+ && pip install --no-cache-dir -r ml-requirements.txt
 
 # ------------------------------------------------------------------------------- app
 # The pipeline imports src.* and runs src.pipeline, which subprocesses `python -m src.<stage>`,

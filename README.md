@@ -18,7 +18,7 @@ recommendations for a 970,998-line retail panel, plus a Streamlit dashboard.
 ## Setup
 
 ```bash
-pip install -r requirements-ml.txt   # app + modelling stack + tests
+pip install -r ml-requirements.txt   # app + modelling stack + tests
 python generate_retail_pulse.py      # raw data, seeded, not committed
 python -m src.precompute             # aggregates the dashboard reads
 python -m pytest tests/ -q           # 517 tests
@@ -33,7 +33,7 @@ pip install -r requirements.txt       # streamlit, pandas, numpy
 `requirements.txt` is deliberately just those three packages, because it is the file
 **Streamlit Community Cloud installs** and Cloud offers no way to point it elsewhere. Keeping
 Prophet, TensorFlow, XGBoost, SHAP and Evidently in it would make a ~2.5 GB install the price
-of opening the public demo. The modelling stack lives in `requirements-ml.txt`, which extends
+of opening the public demo. The modelling stack lives in `ml-requirements.txt`, which extends
 the app set rather than restating it. `tests/test_tier3.py` fails the build if that stops
 being true.
 

@@ -226,7 +226,7 @@ class TestAirflowDag:
 def active_lines(text: str) -> str:
     """Strip comments, so a file that *talks about* a package is not read as depending on it.
 
-    Both the Dockerfile and requirements-ml.txt explain why Prophet is excluded from the
+    Both the Dockerfile and ml-requirements.txt explain why Prophet is excluded from the
     runtime image, which means the word appears in them by design. Testing the raw text
     would assert the opposite of the intent.
     """
@@ -258,14 +258,14 @@ class TestDockerfile:
         # free tier, for a dashboard that plots four committed CSVs.
         #
         # It installs the root requirements.txt, and that file is lean. Both halves matter:
-        # swapping the Dockerfile to requirements-ml.txt, or putting Prophet back in the root
+        # swapping the Dockerfile to ml-requirements.txt, or putting Prophet back in the root
         # file, produces the same bad image by a different route. Streamlit Community Cloud
         # reads the root file too, so "lean at the root" is what keeps the public demo from
         # paying a quarter-gigabyte install on every cold start.
         assert "-r requirements.txt" in active_lines(dockerfile), (
             "the runtime image must install the lean app set"
         )
-        assert "requirements-ml.txt" not in active_lines(dockerfile), (
+        assert "ml-requirements.txt" not in active_lines(dockerfile), (
             "the runtime image must not install the modelling stack"
         )
         root = active_lines((ROOT / "requirements.txt").read_text(encoding="utf-8")).lower()
@@ -331,11 +331,11 @@ class TestDockerfile:
         Streamlit Community Cloud reads the root ``requirements.txt`` and offers no way to
         point it elsewhere, so that file *is* the deploy. It must therefore contain what
         serving a page needs and nothing more, and the modelling stack must live in
-        requirements-ml.txt. This is the check that fails loudly if someone helpfully moves
+        ml-requirements.txt. This is the check that fails loudly if someone helpfully moves
         Prophet back into the root file.
         """
         root = active_lines((ROOT / "requirements.txt").read_text(encoding="utf-8")).lower()
-        ml = (ROOT / "requirements-ml.txt").read_text(encoding="utf-8").lower()
+        ml = (ROOT / "ml-requirements.txt").read_text(encoding="utf-8").lower()
 
         # Anything needed to serve a page must be present.
         for package in ("streamlit", "pandas", "numpy"):
@@ -346,12 +346,12 @@ class TestDockerfile:
             assert heavy not in root, (
                 f"{heavy} does not belong in the file Streamlit Community Cloud installs"
             )
-            assert heavy in ml, f"{heavy} still has to be declared, in requirements-ml.txt"
+            assert heavy in ml, f"{heavy} still has to be declared, in ml-requirements.txt"
 
         # The ML file must build on the app file rather than duplicate it, so the two cannot
         # drift apart.
         assert "-r requirements.txt" in ml, (
-            "requirements-ml.txt should extend the app set instead of restating it"
+            "ml-requirements.txt should extend the app set instead of restating it"
         )
 
 

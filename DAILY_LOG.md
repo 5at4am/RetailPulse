@@ -742,7 +742,7 @@ every cold start with a ~2.5 GB install, including the compiled Stan toolchain P
 which is the single most common way a Cloud deploy dies. The lean set lived in
 `requirements-dashboard.txt`, which is reachable by the Dockerfile and by nothing else. So the
 split was inverted for Cloud's benefit: the root file is now the three-package app set, and the
-modelling stack moved to `requirements-ml.txt`, which extends it with `-r requirements.txt` so
+modelling stack moved to `ml-requirements.txt`, which extends it with `-r requirements.txt` so
 the two cannot drift. `tests/test_tier3.py` asserts both halves, and CI's dashboard job installs
 the root file on purpose so it proves the app runs on what Cloud will install.
 

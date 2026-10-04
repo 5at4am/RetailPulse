@@ -321,11 +321,11 @@ class TestImagesExistForEveryReferencedImage:
         from src import config
 
         text = (config.ROOT / "Dockerfile.pipeline").read_text(encoding="utf-8")
-        # Requirements must come from requirements-ml.txt. The root requirements.txt is now the
+        # Requirements must come from ml-requirements.txt. The root requirements.txt is now the
         # lean app set -- deliberately, because Streamlit Community Cloud installs it to serve
         # the public demo -- so a pipeline image built from it would fail on the first Prophet
         # import. That inversion is exactly what made every stage fail on import.
-        assert "requirements-ml.txt" in text
+        assert "ml-requirements.txt" in text
         # Comments are stripped, because this file names the lean set by design in order to
         # explain the split, and a substring search over raw text would read the explanation as
         # the dependency. Line continuations are joined so that a `RUN ... \` + `&& pip install`
@@ -345,9 +345,9 @@ class TestImagesExistForEveryReferencedImage:
         sources = {
             match
             for line in active
-            for match in re.findall(r"-r\s+(requirements[\w.-]*\.txt)", line)
+            for match in re.findall(r"-r\s+([\w.-]*requirements[\w.-]*\.txt)", line)
         }
-        assert "requirements-ml.txt" in sources, (
+        assert "ml-requirements.txt" in sources, (
             f"the pipeline image must install the modelling dependency set; saw {sources}"
         )
         assert not any(
@@ -402,7 +402,7 @@ class TestKubernetesManifestAgreesWithTheCode:
         from src import config
         text = (config.ROOT / "deploy" / "kubernetes" / "pipeline-cronjob.yaml").read_text(
             encoding="utf-8")
-        # Only the requirement lines. requirements-ml.txt NAMES prophet, tensorflow and xgboost
+        # Only the requirement lines. ml-requirements.txt NAMES prophet, tensorflow and xgboost
         # as real requirements, so this must be read from the app set -- and that file NAMES them
         # in comments only to explain the exclusion, which is why comments are stripped.
         lines = (config.ROOT / "requirements.txt").read_text(
