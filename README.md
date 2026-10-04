@@ -21,7 +21,7 @@ recommendations for a 970,998-line retail panel, plus a Streamlit dashboard.
 pip install -r requirements-ml.txt   # app + modelling stack + tests
 python generate_retail_pulse.py      # raw data, seeded, not committed
 python -m src.precompute             # aggregates the dashboard reads
-python -m pytest tests/ -q           # 510 tests
+python -m pytest tests/ -q           # 517 tests
 ```
 
 To run only the dashboard, install the lean app set instead:
@@ -116,11 +116,19 @@ app/            Streamlit pages + cached data loader
 data/processed/ committed aggregates (the dashboard's only input)
 data/raw/       generated, gitignored
 src/            one module per stage
-tests/          510 tests
+tests/          517 tests
 notebooks/      01_results_and_targets, 02_data_and_drift
 reports/        report, drift artefacts, figures, screenshots
+docs/           the design spec this project was built against
+methodology/    the dataset methodology document
 DAILY_LOG.md    dated log of decisions and verification runs
 ```
+
+`models/` holds fitted artefacts and is created by `src/config.py` on first run. It is empty
+in a fresh clone and stays empty on purpose: the artefacts are large, regenerable, and gitignored
+under `models/*.pkl`, `*.joblib`, `*.keras`. The numbers every model produced are committed
+instead, in `data/processed/model_metrics.json`, so a reviewer can check the report against real
+output without retraining anything.
 
 ## Notebooks
 

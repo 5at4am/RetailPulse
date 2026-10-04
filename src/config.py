@@ -3,8 +3,8 @@
     from src.config import RAW, SALES_CSV, load_sales
 
 This is the only module allowed to know where files live. Everything else imports paths
-from here, so re-rooting the project (it is renamed `retail-pulse-data/` -> `RetailPulse/`
-at the end of the build) is a one-file change.
+from here, so re-rooting the project is a one-file change -- which is what makes the
+project directory renameable at the end of the build without touching anything else.
 
 Paths are derived from this file's own location, never from the current working
 directory, so `python -m src.ingest`, `python src/ingest.py`, a pytest run and a Streamlit

@@ -787,6 +787,30 @@ digests, which is the closest thing to a Cloud smoke test available without the 
     navigation reverted, same command             -> 1/5 usable, exit 1
     pandoc + Chrome print-to-pdf                  -> 10 pages, 545 KB, 6 images, 0 U+FFFD
     both notebooks, every code cell re-run        -> 0 failures across 28 cells
+    python -m pytest tests/ -q                    -> 517 passed, 2 warnings
+
+### The screenshot script was capturing half a page
+
+Re-running `python -m src.screenshots` after a server restart produced `4/5 usable`, with Home at
+238 characters of text where the committed capture had 2,451. The manifest blamed navigation:
+"is Home registered with st.navigation?"
+
+Home *was* registered. The cause was the readiness wait. `wait_until_ready` broke out of its poll
+loop as soon as the page had a container, was not running, and exceeded a 200-character floor.
+Home's title and caption alone are 238 characters, so on a cold server the loop exited while the
+rest of the page was still streaming, and never saw the "Weekly revenue" heading that the content
+check then failed to find.
+
+A character floor cannot express "finished", because Streamlit pauses between script chunks with
+the status widget absent. Readiness now waits for each route's own expected text and for the text
+length to stop changing across consecutive polls. `expect` moved from the after-the-fact content
+check into the wait itself, so a half-rendered page is never written to disk in the first place.
+
+Two caveats, because the first version of this fix was also wrong. Stability alone was not
+enough: three identical polls mid-stream look exactly like a finished page, which is why the
+expected text is the actual gate. And the live cold-server reproduction is intermittent — the
+old script passed on one cold restart and failed on another. What is deterministic is the unit
+test, which replays the exact poll sequence and fails without the fix.
 
 ### Why the report was rebuilt twice
 

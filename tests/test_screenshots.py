@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from src import config
+from src import config, screenshots
 
 SCREENSHOT_DIR = config.REPORTS / "screenshots"
 MANIFEST = SCREENSHOT_DIR / "screenshots.json"
@@ -119,6 +119,126 @@ class TestImages:
                 f"{entry['file']} no longer matches the digest recorded in the manifest; "
                 "regenerate the screenshots"
             )
+
+
+class FakeChrome:
+    """Replays a scripted sequence of readiness polls, so the waiting logic can be tested
+    without a browser or a server.
+
+    The real bug this exists for is a timing bug: on a cold server the first polls see only
+    Home's title and caption, which is already past the character floor, and the old loop
+    captured there. Replaying exactly that sequence is the only way to test the fix, because
+    on a warm server the failure does not reproduce at all.
+    """
+
+    def __init__(self, sequence: list[dict]):
+        self._sequence = sequence
+        self.calls = 0
+
+    def evaluate(self, _expression):
+        index = min(self.calls, len(self._sequence) - 1)
+        self.calls += 1
+        return self._sequence[index]
+
+
+def state(text_length: int, *, running: bool = False, text: str = "") -> dict:
+    return {
+        "container": True,
+        "running": running,
+        "exception": False,
+        "exceptionText": "",
+        "textLength": text_length,
+        "text": text,
+    }
+
+
+class TestWaitUntilReadyWaitsForThePageToFinishArriving:
+    """`not running` is not the same as `finished`. Between Streamlit's script chunks the status
+    widget is briefly absent while the page is still being assembled.
+    """
+
+    def test_does_not_capture_a_page_that_is_still_streaming(self):
+        # Home's title and caption alone measure 238 characters -- already over the 200 floor.
+        # The rest of the page then arrives across three more polls, and the heading this test
+        # waits for only shows up in the last one. The old loop stopped at the first poll and
+        # produced a capture with no "Weekly revenue" in it.
+        script = [
+            state(238, running=True),
+            state(238),
+            state(500, running=True),
+            state(1200, running=True),
+            state(2451, text="...Weekly revenue..."),
+            state(2451, text="...Weekly revenue..."),
+            state(2451, text="...Weekly revenue..."),
+        ]
+        chrome = FakeChrome(script)
+        result = screenshots.Chrome.wait_until_ready(
+            chrome, timeout=10.0, settle=0.0, expect="Weekly revenue")
+
+        assert "Weekly revenue" in result["text"], (
+            "wait_until_ready returned before the page's own content arrived; the capture "
+            "would be a partial page that still passes every structural check"
+        )
+        assert chrome.calls >= 5, "it gave up as soon as the character floor was cleared"
+
+    def test_keeps_waiting_while_the_expected_text_is_absent(self):
+        # The pause that broke the length heuristic: three polls in a row with nothing new,
+        # status widget absent, and still no heading. Only the expected-text rule can tell this
+        # apart from a finished page, because by size alone the two are identical.
+        script = [state(238), state(238), state(238), state(238)]
+        chrome = FakeChrome(script)
+        # A timeout long enough for several polls at STABLE_INTERVAL, so "kept polling" and
+        # "gave up early" are distinguishable. It must run to the deadline and return the
+        # paused state rather than reporting the page ready.
+        result = screenshots.Chrome.wait_until_ready(
+            chrome, timeout=2.5, settle=0.0, expect="Weekly revenue")
+
+        assert "Weekly revenue" not in result["text"], "fake text leaked into the fixture"
+        assert chrome.calls >= 4, (
+            f"it stopped after {chrome.calls} polls and called a paused page ready; it should "
+            "keep polling until the expected text appears or the timeout expires"
+        )
+
+    def test_accepts_a_page_immediately_when_it_is_already_settled(self):
+        # A warm server serves the whole page in one response, so this must not add latency.
+        ready = state(2451, text="...Weekly revenue...")
+        chrome = FakeChrome([ready, ready, ready])
+        result = screenshots.Chrome.wait_until_ready(
+            chrome, timeout=10.0, settle=0.0, expect="Weekly revenue")
+
+        assert result["textLength"] == 2451
+        assert chrome.calls == 3, "a settled page should cost exactly the stability polls"
+
+    def test_works_without_an_expectation(self):
+        # Callers that do not know the page still get the length-stability behaviour.
+        chrome = FakeChrome([state(2451), state(2451), state(2451)])
+        result = screenshots.Chrome.wait_until_ready(chrome, timeout=10.0, settle=0.0)
+
+        assert result["textLength"] == 2451
+        assert chrome.calls == 3
+
+    def test_still_reports_an_exception_immediately(self):
+        chrome = FakeChrome([{"container": True, "running": False, "exception": True,
+                              "exceptionText": "KeyError: 'units_sold'", "textLength": 900,
+                              "text": "..."}])
+        result = screenshots.Chrome.wait_until_ready(chrome, timeout=10.0, settle=0.0)
+
+        assert result["exception"] is True
+        assert "units_sold" in result["exceptionText"]
+        assert chrome.calls == 1, "an exception page must not be polled to stability"
+
+    def test_a_short_page_is_not_waited_on_forever(self):
+        # Stability is the new gate, but a genuinely tiny page still has to terminate. This
+        # one stops growing at 150 characters, below the floor, and must still return.
+        chrome = FakeChrome([state(150), state(150), state(150)])
+        screenshots.Chrome.wait_until_ready(chrome, timeout=2.0, settle=0.0)
+        assert chrome.calls >= 2
+
+    def test_the_character_floor_is_not_the_only_gate(self):
+        # Pins the actual defect: 238 characters is over the floor, so a length-only gate
+        # accepts it. If someone reintroduces a length check as the primary condition, this
+        # documents why that is not enough.
+        assert 238 > screenshots.MIN_TEXT_LENGTH
 
 
 class TestThePagesActuallyExist:

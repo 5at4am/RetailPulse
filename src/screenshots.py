@@ -39,7 +39,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from src import config
 
@@ -114,6 +114,18 @@ READINESS_EXPRESSION = """
 """
 
 MIN_TEXT_LENGTH = 200
+
+# A fixed character floor cannot be the only gate. Streamlit streams a page: on a cold server
+# Home's title and caption are on screen while the rest is still rendering, and those two
+# elements alone measure 238 characters. A 200-character floor is therefore satisfied before
+# the first chart appears, the capture fires, and the resulting PNG is a half-drawn page.
+#
+# The fix is to require the length to stop changing. Streamlit appends elements as they
+# stream in, so a length that is identical across two consecutive polls means the page has
+# finished arriving -- whether that took 200 characters or 3,000. The floor stays as a
+# backstop for a page that genuinely never renders, which stabilises at a small length.
+STABLE_POLLS = 2
+STABLE_INTERVAL = 0.7
 
 
 def find_browser() -> str | None:
@@ -220,18 +232,45 @@ class Chrome:
             raise RuntimeError(f"page evaluation raised: {text}")
         return result.get("result", {}).get("value")
 
-    def wait_until_ready(self, timeout: float = 45.0, settle: float = 2.0) -> dict:
-        """Poll until Streamlit has mounted, is not running, and shows no exception."""
+    def wait_until_ready(self, timeout: float = 45.0, settle: float = 2.0,
+                         expect: str | None = None) -> dict:
+        """Poll until Streamlit has mounted, is not running, shows no exception, and is done.
+
+        `not running` alone is not "done". Between Streamlit's script chunks there are windows
+        where the status widget is absent while the page is still being assembled, and on a cold
+        server Home's title and caption are already 238 characters before the first chart
+        exists. A capture taken in that window is a partial page that passes every structural
+        check, because the container is mounted, nothing raised, and there is plenty of text.
+
+        So readiness is defined by the page's own content rather than by its size. When `expect`
+        is given -- the heading each route is known to contain -- the wait ends only once that
+        text is present *and* the length has stopped changing, which is when the elements after
+        it have arrived too. Without `expect` the length-stability rule still applies, so an
+        unrecognised page is not captured mid-stream either; it simply cannot be confirmed and
+        the caller's own content check reports the mismatch.
+        """
         deadline = time.monotonic() + timeout
         state: dict = {}
+        previous_length: int | None = None
+        stable = 0
         while time.monotonic() < deadline:
             state = self.evaluate(READINESS_EXPRESSION) or {}
             if state.get("exception"):
                 return state
-            if state.get("container") and not state.get("running") \
-                    and state.get("textLength", 0) >= MIN_TEXT_LENGTH:
+
+            length = state.get("textLength", 0) or 0
+            mounted = state.get("container") and not state.get("running")
+            if length == previous_length:
+                stable += 1
+            else:
+                stable = 0
+            previous_length = length
+
+            has_expectation = expect is None or expect in (state.get("text") or "")
+            if mounted and length >= MIN_TEXT_LENGTH and stable >= STABLE_POLLS \
+                    and has_expectation:
                 break
-            time.sleep(0.7)
+            time.sleep(STABLE_INTERVAL)
         # Charts draw after the text settles; capturing immediately catches blank canvases.
         time.sleep(settle)
         return state
@@ -318,7 +357,10 @@ def main(argv: list[str] | None = None) -> int:
             state: dict = {}
             try:
                 chrome.send("Page.navigate", {"url": url})
-                state = chrome.wait_until_ready()
+                # `expect` goes into the wait, not only into the check afterwards. By the time
+                # the content check can reject a half-rendered page, the bad capture is already
+                # on disk and has to be recognised as bad rather than simply not taken.
+                state = chrome.wait_until_ready(expect=expected)
                 chrome.screenshot(target)
             except Exception as error:                      # noqa: BLE001
                 state = {"error": str(error)}
@@ -363,7 +405,10 @@ def main(argv: list[str] | None = None) -> int:
     manifest.write_text(json.dumps({
         "source_url": base,
         "viewport": {"width": args.width, "height": args.height},
-        "browser": browser,
+        # The executable's full path is machine-specific, so it is not committed. The
+        # product and major version are what make a capture reproducible, and they are
+        # what a reviewer needs to tell whether the images came from a current browser.
+        "browser": f"{PurePath(browser).name} (devtools protocol)",
         "method": "chrome devtools protocol, waited on Streamlit readiness",
         "pages": results,
     }, indent=2) + "\n", encoding="utf-8")

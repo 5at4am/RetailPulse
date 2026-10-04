@@ -87,11 +87,12 @@ report carry 55% combined, so they are never traded away for infrastructure.
 
 ## 3. Repository layout
 
-Everything lives under the single project root (`retail-pulse-data/`, renamed to
-`RetailPulse/` at the end of the build — deferred so no path breaks mid-build).
+Everything lives under the single project root, named `RetailPulse/`. The rename happened at the
+very end of the build, after code, tests, the CI workflow and the logs had stopped referring to
+the old folder name — which is why nothing in the source hardcodes it.
 
 ```
-retail-pulse-data/            <- project root == GitHub repo root
+RetailPulse/                  <- project root == GitHub repo root
 ├── README.md                 deliverable, 15%
 ├── requirements.txt
 ├── .gitignore
@@ -120,7 +121,8 @@ retail-pulse-data/            <- project root == GitHub repo root
 │   ├── figures/
 │   └── RetailPulse_Report.md source for the PDF
 ├── tests/
-├── docs/specs/
+├── notebooks/          01_results_and_targets, 02_data_and_drift
+├── docs/               this spec
 └── methodology/
 ```
 
