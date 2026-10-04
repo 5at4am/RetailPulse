@@ -1,76 +1,76 @@
 {
-  "source_url": "http://127.0.0.1:8502",
+  "source_url": "http://localhost:8501",
   "viewport": {
     "width": 1440,
     "height": 2400
   },
-  "browser": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "browser": "chrome.exe (devtools protocol)",
   "method": "chrome devtools protocol, waited on Streamlit readiness",
   "pages": [
     {
       "page": "Home",
-      "url": "http://127.0.0.1:8502/",
+      "url": "http://localhost:8501/",
       "file": "01_home.png",
       "caption": "KPI overview and the honest headline findings",
       "expected_text": "Weekly revenue",
       "saw_expected_text": true,
-      "bytes": 237402,
+      "bytes": 241467,
       "text_length": 2451,
       "ok": true,
       "problem": null,
-      "sha256": "8e906b7da7c7a14d"
+      "sha256": "ec56a7d056f1c7cd"
     },
     {
       "page": "Demand_Forecasting",
-      "url": "http://127.0.0.1:8502/Demand_Forecasting",
+      "url": "http://localhost:8501/Demand_Forecasting",
       "file": "02_demand_forecasting.png",
       "caption": "F-03 backtest, model selection, forecast",
       "expected_text": "Model backtest",
       "saw_expected_text": true,
-      "bytes": 235004,
+      "bytes": 240117,
       "text_length": 2687,
       "ok": true,
       "problem": null,
-      "sha256": "67eb3b0d3bbd2fbf"
+      "sha256": "520c39c61d155200"
     },
     {
       "page": "Customer_Segments",
-      "url": "http://127.0.0.1:8502/Customer_Segments",
+      "url": "http://localhost:8501/Customer_Segments",
       "file": "03_customer_segments.png",
       "caption": "F-02 K-Means segmentation",
       "expected_text": "Revenue vs customers",
       "saw_expected_text": true,
-      "bytes": 208950,
+      "bytes": 213126,
       "text_length": 1768,
       "ok": true,
       "problem": null,
-      "sha256": "9d692efa0b3b6989"
+      "sha256": "3d24581b55333b37"
     },
     {
       "page": "Churn_Risk",
-      "url": "http://127.0.0.1:8502/Churn_Risk",
+      "url": "http://localhost:8501/Churn_Risk",
       "file": "04_churn_risk.png",
       "caption": "F-04 XGBoost scoring and SHAP",
       "expected_text": "AUC target missed",
       "saw_expected_text": true,
-      "bytes": 237937,
+      "bytes": 238997,
       "text_length": 2525,
       "ok": true,
       "problem": null,
-      "sha256": "4d956052ba101f33"
+      "sha256": "38d0cbb57ec8e17a"
     },
     {
       "page": "Inventory_Recommendations",
-      "url": "http://127.0.0.1:8502/Inventory_Recommendations",
+      "url": "http://localhost:8501/Inventory_Recommendations",
       "file": "05_inventory_recommendations.png",
       "caption": "F-05 reorder plan",
       "expected_text": "Why safety stock is a Poisson quantile",
       "saw_expected_text": true,
-      "bytes": 236273,
+      "bytes": 243574,
       "text_length": 3248,
       "ok": true,
       "problem": null,
-      "sha256": "3c0fc9a31bdc74ef"
+      "sha256": "a227137b1000a591"
     }
   ]
 }
