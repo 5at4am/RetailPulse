@@ -1,0 +1,70 @@
+{
+  "sales": {
+    "rows": 250000,
+    "columns": 27,
+    "units": 970998,
+    "revenue": 210242624.35,
+    "transactions": 60538,
+    "customers": 8000,
+    "products": 1200,
+    "stores": 50,
+    "categories": 10,
+    "cities": 12,
+    "date_from": "2024-01-01",
+    "date_to": "2025-12-31",
+    "days": 731,
+    "stockout_rows": 7500,
+    "stockout_pct": 3.0,
+    "selling_rows": 242500,
+    "avg_units_per_line": 3.88,
+    "avg_line_value": 840.97,
+    "multi_line_txn_pct": 85.4,
+    "single_line_txn_pct": 14.6,
+    "basket_median": 3,
+    "basket_max": 29,
+    "channels": {
+      "Store": 207174,
+      "Mobile_App": 31412,
+      "Web": 11414
+    },
+    "promoted_lines": 21004,
+    "promotions": {
+      "New_Year_Offer": 2263,
+      "Weekend_Flash": 11508,
+      "Loyalty_Flash": 1552,
+      "Clearance_Stock": 1630,
+      "Republic_Day_Deal": 1265,
+      "Diwali_Sale": 2786
+    },
+    "pareto50": 4.8,
+    "pareto80": 19.4,
+    "pareto90": 35.0,
+    "repeat_customer_pct": 87.3
+  },
+  "panel": {
+    "rows": 780000,
+    "columns": 15,
+    "units": 803564,
+    "revenue": 136165476.5,
+    "weeks": 104,
+    "week_from": "2024-01-01",
+    "week_to": "2025-12-22",
+    "products": 150,
+    "stores": 50,
+    "zero_demand_pct": 77.9,
+    "stockout_week_rows": 6959,
+    "stockout_count_total": 7993,
+    "grain": "store x product x week"
+  },
+  "files": {
+    "retail_pulse_sales.csv": {
+      "mb": 45.4
+    },
+    "retail_pulse_demand_panel.csv": {
+      "mb": 63.4
+    },
+    "retail_pulse_data_dictionary.md": {
+      "mb": 0.0
+    }
+  }
+}

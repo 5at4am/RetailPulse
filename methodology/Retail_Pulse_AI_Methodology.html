@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Retail Pulse AI - Dataset Methodology</title>
+<style>/* Retail Pulse AI - dataset methodology, for management review.
+   Rendered to PDF via headless Chrome. Numbers come from facts.json, not memory. */
+
+@page {
+  size: A4;
+  margin: 16mm 15mm 16mm 15mm;
+}
+
+:root {
+  --ink: #16202b;
+  --muted: #5b6b7c;
+  --line: #d7dee6;
+  --accent: #1f5f8b;
+  --accent-soft: #eaf2f8;
+  --good: #17694a;
+  --warn: #8a5a00;
+  --warn-soft: #fdf6e6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", "Calibri", system-ui, sans-serif;
+  font-size: 9.6pt;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+h1 {
+  font-size: 20pt;
+  margin: 0 0 2mm;
+  letter-spacing: -0.3pt;
+  color: var(--accent);
+}
+
+h2 {
+  font-size: 11.5pt;
+  margin: 7mm 0 2.5mm;
+  padding-bottom: 1.4mm;
+  border-bottom: 1.4pt solid var(--accent);
+  color: var(--accent);
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 10pt;
+  margin: 4mm 0 1.5mm;
+  color: var(--ink);
+  page-break-after: avoid;
+}
+
+p { margin: 0 0 2.2mm; }
+ul, ol { margin: 0 0 2.5mm; padding-left: 5.5mm; }
+li { margin-bottom: 1.1mm; }
+
+.subtitle { font-size: 10.5pt; color: var(--muted); margin-bottom: 1mm; }
+.meta { font-size: 8.6pt; color: var(--muted); border-bottom: 0.8pt solid var(--line);
+        padding-bottom: 3mm; margin-bottom: 4mm; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 3mm;
+  font-size: 8.9pt;
+}
+
+th {
+  background: var(--accent-soft);
+  text-align: left;
+  font-weight: 600;
+  padding: 1.6mm 2mm;
+  border-bottom: 1pt solid var(--line);
+  color: var(--accent);
+}
+
+td { padding: 1.5mm 2mm; border-bottom: 0.5pt solid var(--line); vertical-align: top; }
+tr { page-break-inside: avoid; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.callout {
+  border-left: 2.6pt solid var(--accent);
+  background: var(--accent-soft);
+  padding: 2.6mm 3mm;
+  margin: 0 0 3.5mm;
+  page-break-inside: avoid;
+}
+
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+
+.callout p:last-child { margin-bottom: 0; }
+.callout .label { font-weight: 600; color: var(--accent); display: block; margin-bottom: 1mm; }
+.callout.warn .label { color: var(--warn); }
+
+.kpis { display: flex; gap: 2.5mm; margin: 0 0 4mm; }
+.kpi {
+  flex: 1;
+  border: 0.7pt solid var(--line);
+  border-radius: 1.6mm;
+  padding: 2.4mm 2.6mm;
+  page-break-inside: avoid;
+}
+.kpi .v { font-size: 13pt; font-weight: 650; color: var(--accent); line-height: 1.1; }
+.kpi .l { font-size: 7.6pt; color: var(--muted); text-transform: uppercase;
+          letter-spacing: 0.25pt; margin-top: 0.8mm; }
+
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 8mm;
+  margin-bottom: 2.8mm;
+}
+.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0; top: 0.2mm;
+  width: 5.2mm; height: 5.2mm;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 5.2mm;
+  font-size: 8pt;
+  font-weight: 600;
+}
+
+code {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 8.6pt;
+  background: #f2f5f8;
+  padding: 0.3mm 0.9mm;
+  border-radius: 0.7mm;
+}
+
+pre {
+  background: #f7f9fb;
+  border: 0.6pt solid var(--line);
+  border-radius: 1.4mm;
+  padding: 2.4mm 3mm;
+  font-size: 8.3pt;
+  line-height: 1.4;
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+
+.tag {
+  display: inline-block;
+  font-size: 7.4pt;
+  font-weight: 600;
+  padding: 0.5mm 1.6mm;
+  border-radius: 0.8mm;
+  text-transform: uppercase;
+  letter-spacing: 0.3pt;
+}
+.tag.yes { background: #e3f3ea; color: var(--good); }
+.tag.no  { background: #fdecec; color: #a32626; }
+.tag.part{ background: var(--warn-soft); color: var(--warn); }
+
+.page-break { page-break-before: always; }
+.avoid { page-break-inside: avoid; }
+
+footer {
+  margin-top: 8mm;
+  padding-top: 2.5mm;
+  border-top: 0.8pt solid var(--line);
+  font-size: 7.8pt;
+  color: var(--muted);
+}
+
+.qa { font-size: 8.9pt; }
+.qa td { border-bottom: 0.5pt solid var(--line); }
+.qa .q { font-weight: 600; color: var(--accent); width: 34%; }
+.qa .say { font-style: italic; color: var(--muted); }</style></head><body>
+<header>
+  <h1>Retail Pulse AI &mdash; Synthetic Retail Dataset</h1>
+  <p class="subtitle">Methodology, validation evidence, and known limitations</p>
+  <p class="meta">
+    Prepared for management review &middot; Dataset version: seed <code>20240101</code>
+    (deterministic) &middot; Every figure in this document is computed directly from the
+    delivered CSV files, not typed by hand.
+  </p>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="v">2,50,000</div><div class="l">Transaction lines</div></div><div class="kpi"><div class="v">7,80,000</div><div class="l">Forecasting panel rows</div></div><div class="kpi"><div class="v">INR 21.02 Cr</div><div class="l">Revenue modelled</div></div><div class="kpi"><div class="v">8,000</div><div class="l">Customers</div></div><div class="kpi"><div class="v">1,200</div><div class="l">Products</div></div>
+</div>
+
+<h2>1. What this is, in one paragraph</h2>
+<p>
+  A purpose-built <strong>synthetic</strong> retail dataset for an Indian grocery chain,
+  covering <strong>2024-01-01 to 2025-12-31</strong> (731 days). It is generated
+  by a Python program &mdash; not collected from real customers &mdash; and models the
+  behaviour we actually need to analyse: which products sell, in which store, in which city,
+  at what price, under which promotion, and what happens to sales when stock runs out.
+</p>
+<p>
+  It ships as two files. The <strong>transaction file</strong> holds 2,50,000 individual
+  line-items across 60,538 shopping transactions &mdash; the grain you use for
+  customer insight, basket analysis and revenue reporting. The <strong>forecasting panel</strong>
+  holds 7,80,000 rows at store &times; product &times; week grain, covering
+  104 complete weeks from <strong>2024-01-01 to 2025-12-22</strong>, across
+  50 stores and 150 products. It is already aggregated and deliberately
+  dense: 77.9% of rows are genuine zero-demand weeks, which is what a real
+  demand-forecasting input needs and what a naive aggregate would destroy.
+</p>
+
+<div class="callout">
+  <span class="label">Why synthetic rather than real retail data</span>
+  <p>
+    Published retail datasets are usually wholesale led, cover 2009&ndash;2011, and carry
+    no store, city, promotion or inventory fields &mdash; so they cannot answer Indian
+    retail questions. Synthetic data also gives us something real data never can: the
+    <strong>true answer is known</strong>, so model accuracy is measurable rather than
+    assumed.
+  </p>
+</div>
+
+<h2>2. How it was built</h2>
+<ol class="steps">
+  <li>
+    <strong>Scope was fixed first.</strong> 50 stores across 12 Indian cities, 1,200 products
+    in 10 categories, 8,000 customers, and the period 2024-01-01&ndash;2025-12-31.
+    The row budget was capped at exactly 2,50,000 line-items.
+  </li>
+  <li>
+    <strong>Structure was modelled, not faked.</strong> Each product belongs to a category
+    with its own pack sizes and price band. Each store carries an assortment; each customer
+    has a loyalty tier and a segment. Every product is guaranteed to be stocked somewhere
+    and to actually sell, so no product or customer is a dead record.
+  </li>
+  <li>
+    <strong>Demand was shaped deliberately.</strong> Weekly seasonality, Indian festival
+    peaks (Diwali, New Year, Republic Day), weekday and weekend effects, category-specific
+    seasonality, and a realistic long-tail where a small slice of the catalogue drives most
+    revenue. Baskets are multi-item and vary by customer type, including bulk shoppers.
+  </li>
+  <li>
+    <strong>Inventory was simulated causally.</strong> Stock levels drive sales, not the
+    reverse. When a shelf empties, a stock-out line is recorded with zero quantity &mdash;
+    that is lost demand, not a data error. 7,500 such lines
+    (3%) exist, and the forecasting panel carries the
+    6,959 affected store-weeks so demand models can learn from them.
+  </li>
+  <li>
+    <strong>Every row was held to arithmetic rules.</strong> Revenue must equal quantity
+    multiplied by price less discount; a discount may only exist on a genuinely promoted
+    line; zero quantity implies zero stock remaining; no quantity or stock may be negative.
+    These are enforced, not assumed.
+  </li>
+  <li>
+    <strong>Output is reproducible.</strong> A fixed random seed means re-running the
+    generator reproduces both files byte-for-byte. Any number in this document can be
+    re-derived from the delivered CSVs.
+  </li>
+</ol>
+
+<h2>3. Why the numbers look realistic</h2>
+<p>
+  Rather than trusting the generator, its output was <strong>calibrated against a real,
+  published retail dataset</strong> &mdash; the UCI Online Retail II dataset, 1,067,371
+  transaction lines from the UK, 2009&ndash;2011. Real data was used as a structural
+  benchmark, not copied, because it does not match the business context.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Structural property</th><th class="num">Real reference data</th>
+        <th class="num">Our dataset</th><th>Read</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>SKUs needed for 50% of revenue</td><td class="num">5.2%</td>
+        <td class="num">4.8%</td><td>Long tail present and correctly shaped</td></tr>
+    <tr><td>SKUs needed for 80% of revenue</td><td class="num">19.6%</td>
+        <td class="num">19.4%</td><td>Concentration closely matched</td></tr>
+    <tr><td>Line-items per SKU</td><td class="num">201</td>
+        <td class="num">208</td><td>Product velocity distribution matches</td></tr>
+    <tr><td>Transactions per customer (mean)</td><td class="num">7.6</td>
+        <td class="num">7.6</td><td>Repeat-purchase behaviour matches</td></tr>
+  </tbody>
+</table>
+
+<p>
+  Price levels were deliberately <em>not</em> copied: the reference data is UK giftware at a
+  &pound;2.10 median, whereas this is Indian grocery at a INR 217
+  median line value. The reference dataset also mixes in wholesale buyers, so its headline
+  basket size of 20 items is not representative of a consumer shop &mdash; basket size here is
+  3 at the median, with 14.6% of baskets being a single
+  item, which matches consumer retail behaviour.
+</p>
+
+<h2>4. Evidence of quality</h2>
+<p>
+  Every delivered file was checked by an automated test suite. These checks run on demand
+  and fail loudly rather than passing silently.
+</p>
+
+<table>
+  <thead><tr><th>Check</th><th class="num">Result</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Specification conformance</td><td class="num">54 / 54</td>
+        <td>Row count, column order, ranges, formula integrity, seasonality, calibration targets</td></tr>
+    <tr><td>Missing values</td><td class="num">0</td>
+        <td>Across all 27 columns, including several spellings of null</td></tr>
+    <tr><td>Duplicate rows</td><td class="num">0</td>
+        <td>Including the natural key of each file, so no grouping double-counts</td></tr>
+    <tr><td>Date validity</td><td class="num">0 bad</td>
+        <td>731 consecutive days, no gaps, no invalid dates, derived columns agree</td></tr>
+    <tr><td>Panel &harr; sales consistency</td><td class="num">exact</td>
+        <td>Panel reconciles to the sales file to the rupee, with a documented scope difference</td></tr>
+    <tr><td>Validator self-test</td><td class="num">8 / 8</td>
+        <td>Confirms the validator actually catches corrupted data</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <span class="label">A note on the validator</span>
+  <p>
+    A data check that always passes is worthless. So the validator is itself tested against
+    deliberately corrupted data: each of the eight core rules is broken in turn, and the
+    validator must catch every one. It catches all eight.
+  </p>
+</div>
+
+<h2>5. What the dataset can be used for</h2>
+<ul>
+  <li><strong>Demand forecasting</strong> &mdash; the dense weekly panel is a ready training input.</li>
+  <li><strong>Customer segmentation</strong> &mdash; 8,000 customers with
+      87.3% repeat rate and 85.4% multi-item baskets.</li>
+  <li><strong>Promotion effectiveness</strong> &mdash; 21,004 promoted lines
+      across 6 campaigns, with discounts recorded per line.</li>
+  <li><strong>Basket and affinity analysis</strong> &mdash; transaction identifiers group lines
+      into true baskets; no product repeats within a basket.</li>
+  <li><strong>Revenue reporting</strong> &mdash; daily, weekly, or per city, store or category.</li>
+</ul>
+
+<table class="avoid">
+  <thead><tr><th>Channel</th><th class="num">Lines</th><th class="num">Share</th></tr></thead>
+  <tbody><tr><td>Store</td><td class="num">2,07,174</td><td class="num">82.9%</td></tr><tr><td>Mobile_App</td><td class="num">31,412</td><td class="num">12.6%</td></tr><tr><td>Web</td><td class="num">11,414</td><td class="num">4.6%</td></tr></tbody>
+</table>
+
+<h2>6. Known limitations &mdash; please read before use</h2>
+<p>
+  These are genuine constraints, stated plainly. Any one of them is a reason to treat
+  findings as directional rather than exact.
+</p>
+
+<table>
+  <thead><tr><th>Limitation</th><th>Impact</th><th>Workaround</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>No returns</strong><br><span class="tag no">absent</span></td>
+      <td>Real retail is 2&ndash;4% returns. Here quantity is always zero or positive, so
+          return-driven revenue reversal cannot be modelled.</td>
+      <td>Model returns as a separate rate applied on top.</td>
+    </tr>
+    <tr>
+      <td><strong>No cost or margin</strong><br><span class="tag no">absent</span></td>
+      <td>Only price and discount are present, so profitability, margin and
+          contribution analysis cannot be done.</td>
+      <td>Join a cost table from the product master.</td>
+    </tr>
+    <tr>
+      <td><strong>No customer demographics</strong><br><span class="tag part">limited</span></td>
+      <td>Only loyalty tier and segment exist &mdash; no age, gender or income.</td>
+      <td>Use segment as the proxy, or join an external profile.</td>
+    </tr>
+    <tr>
+      <td><strong>Panel covers 150 of 1,200 products</strong><br><span class="tag part">subset</span></td>
+      <td>A forecast cannot be produced for the other 1,050 products from the panel alone. The
+          panel also stops at 2025-12-22 so that every week it contains is complete.</td>
+      <td>Extend the panel by re-running the generator with a larger product list.</td>
+    </tr>
+    <tr>
+      <td><strong>Final week is incomplete</strong><br><span class="tag part">timing</span></td>
+      <td>Data ends 2025-12-31, so the week starting 2025-12-29 holds only 3 of its 7 days
+          and shows about 37% of a normal week.</td>
+      <td>The bundled weekly roll-up drops it automatically.</td>
+    </tr>
+    <tr>
+      <td><strong>Synthetic, not observed</strong><br><span class="tag part">nature</span></td>
+      <td>Behaviour is modelled, not measured. It will not capture a real promotion that
+          failed, or a supply shock the model does not know about.</td>
+      <td>Validate findings against live data before any commercial commitment.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <span class="label">Recommended use</span>
+  <p>
+    This dataset is best suited to <strong>development, model training, pipeline testing and
+    demonstrating approach</strong> &mdash; situations where the right answer is known and
+    accuracy can be measured. It should <strong>not</strong> be the sole basis of a pricing,
+    stocking or investment decision. Real transaction data remains the reference for anything
+    commercially binding.
+  </p>
+</div>
+
+<h2 class="page-break">7. Likely questions, and how to answer them</h2>
+<p>
+  For the conversation itself. The left column is the question; the right is a short,
+  plain-language answer you can give.
+</p>
+
+<table class="qa">
+  <tbody>
+    <tr>
+      <td class="q">"Is this real customer data?"</td>
+      <td>No &mdash; it is generated by a program, not collected from customers. It is
+          modelled on real retail behaviour and calibrated against a real published dataset.</td>
+    </tr>
+    <tr>
+      <td class="q">"Then why not just use real data?"</td>
+      <td>Public retail datasets are wholesale-led, from 2009&ndash;2011, and have no store,
+          city, promotion or stock fields. They cannot answer Indian retail questions. And with
+          real data nobody knows the true answer, so model accuracy cannot be measured.</td>
+    </tr>
+    <tr>
+      <td class="q">"How do we know it is any good?"</td>
+      <td>54 automated checks pass, and the output was calibrated against a real dataset
+          &mdash; for example 19.4% of products generate 80% of revenue here, against
+          19.6% in real data.</td>
+    </tr>
+    <tr>
+      <td class="q">"How long did it take?"</td>
+      <td>The generator runs in about 7 seconds once written. The work was in modelling the
+          behaviour and validating it, not in producing volume.</td>
+    </tr>
+    <tr>
+      <td class="q">"What did it cost?"</td>
+      <td>Nothing to license &mdash; it uses only the Python standard library. No tool
+          purchase, no per-seat cost, no vendor lock-in.</td>
+    </tr>
+    <tr>
+      <td class="q">"Can we delete it and regenerate?"</td>
+      <td>Yes. A fixed seed reproduces both files byte-for-byte.</td>
+    </tr>
+    <tr>
+      <td class="q">"Can we use it for a customer-facing decision?"</td>
+      <td>Not on its own. It is right for building and testing. Anything commercially binding
+          should be confirmed against live sales first.</td>
+    </tr>
+    <tr>
+      <td class="q">"What are the biggest gaps?"</td>
+      <td>Returns, cost and margin, and customer demographics are not modelled. The
+          forecasting panel also covers 150 of 1,200 products.</td>
+    </tr>
+    <tr>
+      <td class="q">"Who built it?"</td>
+      <td>I built it &mdash; the generator, the data dictionary and the validation suite are
+          all delivered alongside the data.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>8. What is delivered</h2>
+<table>
+  <thead><tr><th>File</th><th class="num">Size</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>retail_pulse_sales.csv</code></td>
+        <td class="num">45.4 MB</td>
+        <td>2,50,000 transaction line-items, 27 columns &mdash; customer insight and reporting</td></tr>
+    <tr><td><code>retail_pulse_demand_panel.csv</code></td>
+        <td class="num">63.4 MB</td>
+        <td>7,80,000 rows, 15 columns, store &times; product &times; week &mdash; forecasting input</td></tr>
+    <tr><td><code>retail_pulse_data_dictionary.md</code></td>
+        <td class="num">&mdash;</td>
+        <td>Every column defined, business rules, validation results and limitations</td></tr>
+    <tr><td><code>generate_retail_pulse.py</code></td>
+        <td class="num">&mdash;</td>
+        <td>Regenerates both files from the seed</td></tr>
+    <tr><td><code>retail_pulse.py</code></td>
+        <td class="num">&mdash;</td>
+        <td>Loads the data with types applied and re-checks the rules</td></tr>
+    <tr><td><code>verify_dataset.py</code>, <code>audit_quality.py</code></td>
+        <td class="num">&mdash;</td>
+        <td>Re-runnable checks behind every figure in section 4</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  Retail Pulse AI &mdash; synthetic retail dataset. Figures computed directly from the
+  delivered CSV files. Synthetic data for development and modelling; not a substitute for
+  live transaction data in commercial decisions.
+</footer>
+</body></html>

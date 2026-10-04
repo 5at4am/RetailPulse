@@ -1,0 +1,51 @@
+# Raw data is reproducible: generate_retail_pulse.py is seeded with SEED = 20240101,
+# so these two CSVs (104 MB together) never need to be committed. Small aggregates
+# written by src/precompute.py into data/processed/ ARE committed -- the dashboard
+# reads them, and they are only a few MB.
+data/raw/
+*.csv
+!data/processed/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Secrets -- never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+service_account*.json
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Model artefacts that are large and regenerable.
+# Small, deliberately-committed artefacts (metrics json, small aggregates) stay.
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.keras
+models/*/scaler.pkl
+models/*/encoder.pkl
+
+# Data-quality reports that are large logs rather than deliverables.
+*.log

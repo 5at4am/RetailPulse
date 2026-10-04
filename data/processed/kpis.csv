@@ -1,0 +1,10 @@
+metric,value,detail
+revenue,210242624.35,2024-01-01 to 2025-12-31
+units sold,970998.0,line items
+customers,8000.0,unique
+products,1200.0,SKU
+stores,50.0,location
+repeat purchase rate,0.8722,share of customers buying on >1 distinct date
+zero-demand share (clean weeks),0.7792,after dropping the partial final week
+zero-demand panel share,0.779,"why WAPE is the headline metric, not MAPE"
+forecast horizon,1.0,"weeks, per the brief"

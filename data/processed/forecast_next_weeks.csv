@@ -1,0 +1,8 @@
+horizon_weeks,weeks_ahead,model,holdout_wape,forecast_units
+1,1,prophet,0.006829,8393.976259079138
+2,1,seasonal_naive,0.021336,8894.0
+2,2,seasonal_naive,0.021336,6804.0
+4,1,seasonal_naive,0.038349,8894.0
+4,2,seasonal_naive,0.038349,6804.0
+4,3,seasonal_naive,0.038349,6101.0
+4,4,seasonal_naive,0.038349,6602.0

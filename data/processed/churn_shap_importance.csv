@@ -1,0 +1,11 @@
+feature,mean_abs_shap
+recency_days,0.5242623
+frequency,0.22795102
+tenure_days,0.088981204
+avg_basket_value,0.08769079
+category_diversity,0.0560569
+units_per_line,0.04890103
+monetary,0.03859836
+promo_share,0.0239129
+online_share,0.012009917
+mean_discount_pct,0.011556514

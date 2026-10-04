@@ -1,0 +1,177 @@
+/* Retail Pulse AI - dataset methodology, for management review.
+   Rendered to PDF via headless Chrome. Numbers come from facts.json, not memory. */
+
+@page {
+  size: A4;
+  margin: 16mm 15mm 16mm 15mm;
+}
+
+:root {
+  --ink: #16202b;
+  --muted: #5b6b7c;
+  --line: #d7dee6;
+  --accent: #1f5f8b;
+  --accent-soft: #eaf2f8;
+  --good: #17694a;
+  --warn: #8a5a00;
+  --warn-soft: #fdf6e6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", "Calibri", system-ui, sans-serif;
+  font-size: 9.6pt;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+h1 {
+  font-size: 20pt;
+  margin: 0 0 2mm;
+  letter-spacing: -0.3pt;
+  color: var(--accent);
+}
+
+h2 {
+  font-size: 11.5pt;
+  margin: 7mm 0 2.5mm;
+  padding-bottom: 1.4mm;
+  border-bottom: 1.4pt solid var(--accent);
+  color: var(--accent);
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: 10pt;
+  margin: 4mm 0 1.5mm;
+  color: var(--ink);
+  page-break-after: avoid;
+}
+
+p { margin: 0 0 2.2mm; }
+ul, ol { margin: 0 0 2.5mm; padding-left: 5.5mm; }
+li { margin-bottom: 1.1mm; }
+
+.subtitle { font-size: 10.5pt; color: var(--muted); margin-bottom: 1mm; }
+.meta { font-size: 8.6pt; color: var(--muted); border-bottom: 0.8pt solid var(--line);
+        padding-bottom: 3mm; margin-bottom: 4mm; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 3mm;
+  font-size: 8.9pt;
+}
+
+th {
+  background: var(--accent-soft);
+  text-align: left;
+  font-weight: 600;
+  padding: 1.6mm 2mm;
+  border-bottom: 1pt solid var(--line);
+  color: var(--accent);
+}
+
+td { padding: 1.5mm 2mm; border-bottom: 0.5pt solid var(--line); vertical-align: top; }
+tr { page-break-inside: avoid; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.callout {
+  border-left: 2.6pt solid var(--accent);
+  background: var(--accent-soft);
+  padding: 2.6mm 3mm;
+  margin: 0 0 3.5mm;
+  page-break-inside: avoid;
+}
+
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+
+.callout p:last-child { margin-bottom: 0; }
+.callout .label { font-weight: 600; color: var(--accent); display: block; margin-bottom: 1mm; }
+.callout.warn .label { color: var(--warn); }
+
+.kpis { display: flex; gap: 2.5mm; margin: 0 0 4mm; }
+.kpi {
+  flex: 1;
+  border: 0.7pt solid var(--line);
+  border-radius: 1.6mm;
+  padding: 2.4mm 2.6mm;
+  page-break-inside: avoid;
+}
+.kpi .v { font-size: 13pt; font-weight: 650; color: var(--accent); line-height: 1.1; }
+.kpi .l { font-size: 7.6pt; color: var(--muted); text-transform: uppercase;
+          letter-spacing: 0.25pt; margin-top: 0.8mm; }
+
+.steps { counter-reset: step; list-style: none; padding-left: 0; }
+.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 8mm;
+  margin-bottom: 2.8mm;
+}
+.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0; top: 0.2mm;
+  width: 5.2mm; height: 5.2mm;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 5.2mm;
+  font-size: 8pt;
+  font-weight: 600;
+}
+
+code {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 8.6pt;
+  background: #f2f5f8;
+  padding: 0.3mm 0.9mm;
+  border-radius: 0.7mm;
+}
+
+pre {
+  background: #f7f9fb;
+  border: 0.6pt solid var(--line);
+  border-radius: 1.4mm;
+  padding: 2.4mm 3mm;
+  font-size: 8.3pt;
+  line-height: 1.4;
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+pre code { background: none; padding: 0; }
+
+.tag {
+  display: inline-block;
+  font-size: 7.4pt;
+  font-weight: 600;
+  padding: 0.5mm 1.6mm;
+  border-radius: 0.8mm;
+  text-transform: uppercase;
+  letter-spacing: 0.3pt;
+}
+.tag.yes { background: #e3f3ea; color: var(--good); }
+.tag.no  { background: #fdecec; color: #a32626; }
+.tag.part{ background: var(--warn-soft); color: var(--warn); }
+
+.page-break { page-break-before: always; }
+.avoid { page-break-inside: avoid; }
+
+footer {
+  margin-top: 8mm;
+  padding-top: 2.5mm;
+  border-top: 0.8pt solid var(--line);
+  font-size: 7.8pt;
+  color: var(--muted);
+}
+
+.qa { font-size: 8.9pt; }
+.qa td { border-bottom: 0.5pt solid var(--line); }
+.qa .q { font-weight: 600; color: var(--accent); width: 34%; }
+.qa .say { font-style: italic; color: var(--muted); }

@@ -1,0 +1,4 @@
+horizon,model,wape
+1,prophet,0.006829
+2,seasonal_naive,0.021336
+4,seasonal_naive,0.038349
