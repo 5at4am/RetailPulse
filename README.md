@@ -21,7 +21,7 @@ recommendations for a 970,998-line retail panel, plus a Streamlit dashboard.
 pip install -r requirements-ml.txt   # app + modelling stack + tests
 python generate_retail_pulse.py      # raw data, seeded, not committed
 python -m src.precompute             # aggregates the dashboard reads
-python -m pytest tests/ -q           # 498 tests
+python -m pytest tests/ -q           # 510 tests
 ```
 
 To run only the dashboard, install the lean app set instead:
@@ -116,7 +116,7 @@ app/            Streamlit pages + cached data loader
 data/processed/ committed aggregates (the dashboard's only input)
 data/raw/       generated, gitignored
 src/            one module per stage
-tests/          508 tests
+tests/          510 tests
 notebooks/      01_results_and_targets, 02_data_and_drift
 reports/        report, drift artefacts, figures, screenshots
 DAILY_LOG.md    dated log of decisions and verification runs

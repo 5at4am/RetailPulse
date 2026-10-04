@@ -781,8 +781,23 @@ digests, which is the closest thing to a Cloud smoke test available without the 
 
 ### Verification
 
-    python -m pytest tests/ -q                     -> 508 passed, 2 warnings
+    python -m pytest tests/ -q                     -> 510 passed, 2 warnings
     fresh clone, `pytest -m "not slow"`           -> 503 passed, 7 deselected
     python -m src.screenshots                     -> 5/5 usable, 5 distinct digests
     navigation reverted, same command             -> 1/5 usable, exit 1
-    pandoc + Chrome print-to-pdf                  -> 11 pages, 560 KB, 6 images, 0 U+FFFD
+    pandoc + Chrome print-to-pdf                  -> 10 pages, 545 KB, 6 images, 0 U+FFFD
+    both notebooks, every code cell re-run        -> 0 failures across 28 cells
+
+### Why the report was rebuilt twice
+
+The first HTML/PDF pair was generated before a capitalisation fix landed in the Markdown, so
+both still carried the lowercase sentence. `tests/test_figures.py` did not catch it: it checks
+that the PDF matches its committed copy and that page count and size are in budget, neither of
+which changes when one letter does. The rebuild also needed the working directory to be
+`reports/`, because the Markdown references `figures/...` relative to itself and pandoc
+silently emitted six broken images instead of failing.
+
+Final PDF is 10 pages rather than 11. That is inside the brief's 10-18 budget, but it is worth
+noticing that the page count moved by one for a one-character edit -- the previous build had
+pushed a short trailing paragraph onto a new page. If the participant adds front matter, check
+the count again rather than assuming the old number.
