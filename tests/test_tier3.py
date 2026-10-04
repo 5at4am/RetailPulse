@@ -226,9 +226,9 @@ class TestAirflowDag:
 def active_lines(text: str) -> str:
     """Strip comments, so a file that *talks about* a package is not read as depending on it.
 
-    Both the Dockerfile and requirements-dashboard.txt explain why Prophet is excluded, which
-    means the word appears in them by design. Testing the raw text would assert the opposite of
-    the intent.
+    Both the Dockerfile and requirements-ml.txt explain why Prophet is excluded from the
+    runtime image, which means the word appears in them by design. Testing the raw text
+    would assert the opposite of the intent.
     """
     return "\n".join(
         line for line in text.splitlines() if not line.lstrip().startswith("#")
@@ -256,10 +256,24 @@ class TestDockerfile:
     def test_does_not_install_the_ml_stack(self, dockerfile):
         # The failure this prevents: a 2 GB image that takes 40s to pull and OOMs on the
         # free tier, for a dashboard that plots four committed CSVs.
-        assert "requirements-dashboard.txt" in dockerfile
-        assert not re.search(r"requirements\.txt", active_lines(dockerfile)), (
-            "the runtime image must install the light dependency set only"
+        #
+        # It installs the root requirements.txt, and that file is lean. Both halves matter:
+        # swapping the Dockerfile to requirements-ml.txt, or putting Prophet back in the root
+        # file, produces the same bad image by a different route. Streamlit Community Cloud
+        # reads the root file too, so "lean at the root" is what keeps the public demo from
+        # paying a quarter-gigabyte install on every cold start.
+        assert "-r requirements.txt" in active_lines(dockerfile), (
+            "the runtime image must install the lean app set"
         )
+        assert "requirements-ml.txt" not in active_lines(dockerfile), (
+            "the runtime image must not install the modelling stack"
+        )
+        root = active_lines((ROOT / "requirements.txt").read_text(encoding="utf-8")).lower()
+        for heavy in ("prophet", "tensorflow", "xgboost", "shap", "evidently"):
+            assert heavy not in root, (
+                f"{heavy} in the root requirements.txt is what Streamlit Community Cloud "
+                "would have to install to serve a page"
+            )
 
     def test_copies_the_aggregates_the_dashboard_reads(self, dockerfile):
         assert "COPY data/processed/" in dockerfile, (
@@ -311,20 +325,34 @@ class TestDockerfile:
             "without 0.0.0.0 the container binds loopback and nothing can reach it"
         )
 
-    def test_dashboard_requirements_are_a_strict_subset(self):
-        full = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-        light = active_lines(
-            (ROOT / "requirements-dashboard.txt").read_text(encoding="utf-8")
-        ).lower()
-        # Anything genuinely needed to serve a page cannot be missing from the light set.
+    def test_the_root_requirements_are_what_cloud_installs_and_they_are_lean(self):
+        """The invariant that makes the public deploy work, asserted in one place.
+
+        Streamlit Community Cloud reads the root ``requirements.txt`` and offers no way to
+        point it elsewhere, so that file *is* the deploy. It must therefore contain what
+        serving a page needs and nothing more, and the modelling stack must live in
+        requirements-ml.txt. This is the check that fails loudly if someone helpfully moves
+        Prophet back into the root file.
+        """
+        root = active_lines((ROOT / "requirements.txt").read_text(encoding="utf-8")).lower()
+        ml = (ROOT / "requirements-ml.txt").read_text(encoding="utf-8").lower()
+
+        # Anything needed to serve a page must be present.
         for package in ("streamlit", "pandas", "numpy"):
-            assert package in light, f"{package} is required to serve the dashboard"
-        # Only assert on packages the project actually depends on. torch is absent because
-        # the LSTM baseline is Keras, and asserting it belongs in requirements.txt would
-        # demand a dependency that should not exist.
-        for heavy in ("prophet", "tensorflow", "xgboost"):
-            assert heavy not in light, f"{heavy} does not belong in the runtime image"
-            assert heavy in full, f"{heavy} should still be in requirements.txt"
+            assert package in root, f"{package} is required to serve the dashboard"
+
+        # Nothing needed only to fit a model may be present.
+        for heavy in ("prophet", "tensorflow", "xgboost", "shap", "evidently", "jupyter"):
+            assert heavy not in root, (
+                f"{heavy} does not belong in the file Streamlit Community Cloud installs"
+            )
+            assert heavy in ml, f"{heavy} still has to be declared, in requirements-ml.txt"
+
+        # The ML file must build on the app file rather than duplicate it, so the two cannot
+        # drift apart.
+        assert "-r requirements.txt" in ml, (
+            "requirements-ml.txt should extend the app set instead of restating it"
+        )
 
 
 # ------------------------------------------------------------------------------------ ci

@@ -3,10 +3,12 @@
 # Tier 3 of the design spec: authored and statically validated, NOT deployed. The spec says
 # this verbatim in the report, and that sentence has to stay true.
 #
-# Two stages. The builder installs only what the dashboard needs, which is deliberately much
-# less than requirements.txt: the app reads committed aggregates from data/processed/ and
-# never imports Prophet, TensorFlow or XGBoost. Baking a 2 GB ML stack into the runtime image
-# because it is in requirements.txt is how a demo URL stops responding.
+# Two stages. The builder installs only what the dashboard needs, which is the whole of the
+# root requirements.txt: the app reads committed aggregates from data/processed/ and never
+# imports Prophet, TensorFlow or XGBoost. The modelling stack lives in requirements-ml.txt and
+# has no business in a runtime image -- baking 2 GB of ML into it is how a demo URL stops
+# responding. The same split is what lets Streamlit Community Cloud install three packages
+# instead of a quarter-gigabyte toolchain.
 #
 #   docker build -t retailpulse .
 #   docker run --rm -p 8501:8501 retailpulse
@@ -33,10 +35,12 @@ RUN apt-get update \
 WORKDIR /app
 
 # --------------------------------------------------------------------------- dependencies
-# Copied on its own so a code edit does not invalidate the dependency layer.
-COPY requirements-dashboard.txt ./
+# The root requirements.txt is the app set (streamlit, pandas, numpy) -- the same three
+# Streamlit Community Cloud installs, so the container and the public demo run identical code
+# against an identical dependency set.
+COPY requirements.txt ./
 
-RUN pip install --no-cache-dir -r requirements-dashboard.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ------------------------------------------------------------------------------- app
 COPY app/ ./app/

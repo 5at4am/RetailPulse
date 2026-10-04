@@ -1,44 +1,26 @@
-# RetailPulse -- runtime dependencies
+# RetailPulse -- app dependencies. This is the file Streamlit Community Cloud installs.
 #
-# Pinned as ranges, not exact versions. Local development runs Python 3.14 / pandas
-# 3.0; Streamlit Community Cloud resolves to 3.11-3.12 and will install the newest
-# version in range. An exact pin would either fail to resolve on Cloud or pin us to a
-# pandas we cannot test locally. See risk R1 in docs/specs/.
+# It is deliberately small. Cloud reads the root `requirements.txt` and there is no way to
+# point it at a different file, so whatever lives here is what the public demo has to install
+# before it can serve a page. Keeping Prophet, TensorFlow, XGBoost, SHAP and Evidently here
+# meant a ~2.5 GB install on every cold start of the deliverable worth 30% of the grade, with
+# a real chance of failing outright on the Stan toolchain that Prophet needs.
+#
+# The full modelling stack lives in `requirements-ml.txt`. Run the models with:
+#     pip install -r requirements-ml.txt
+#
+# This split is safe because the dashboard never imports a model. It reads only the small
+# committed aggregates in `data/processed/` -- see `app/dashboard_data.py`, which is forbidden
+# from touching `data/raw/`, and `tests/test_dashboard.py`, which enforces it with a spy.
+#
+# Ranges, not exact pins. Local development runs Python 3.14 / pandas 3.0; Cloud runs the
+# version named in `.python-version`. An exact pin would fail to resolve on one of them.
+# See risk R1 in docs/superpowers/specs/2026-10-04-retailpulse-design.md.
 
 # --- core data + app -------------------------------------------------------
+# The only three the dashboard actually imports. Verified against every import in app/:
+# pandas, streamlit, and the standard library. numpy arrives with pandas but is listed
+# because src/ reads it directly.
 pandas>=2.2
 numpy>=1.26
-streamlit>=1.37
-plotly>=5.22
-scikit-learn>=1.5
-
-# --- F-03 forecasting ------------------------------------------------------
-# Prophet on category aggregates, LSTM on the same window.
-# Prophet needs cmdstanpy -> a compiled Stan toolchain, which is a common install
-# failure. See the note at the bottom before assuming it resolved.
-prophet>=1.1.5
-tensorflow>=2.16          # LSTM; pulls in keras
-
-# --- F-04 churn ------------------------------------------------------------
-xgboost>=2.1
-shap>=0.45
-
-# --- quality / drift -------------------------------------------------------
-evidently>=0.5
-
-# --- notebooks + reporting -------------------------------------------------
-jupyter>=1.0
-nbformat>=5.10
-
-# --- testing ---------------------------------------------------------------
-pytest>=8.0
-
-# Deliberately NOT pinned to an exact version anywhere: see the R1 note above.
-#
-# Two runtime notes, stated up front rather than discovered on Day 5:
-#   1. Prophet requires cmdstanpy -> a compiled Stan toolchain. On Windows and on
-#      Streamlit Community Cloud that is a common failure point. If Prophet will not
-#      install on the target runtime, F-03 falls back to the statsmodels trend/seasonal
-#      baseline, which is implemented separately, and the report states the substitution.
-#   2. locally, verify what actually resolved with:  python -m pip list > requirements.lock.txt
-#      and commit that file next to this one.
+streamlit>=1.37,<2

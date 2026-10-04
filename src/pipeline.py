@@ -200,9 +200,21 @@ def main(argv: list[str] | None = None) -> int:
             for stage, names in missing.items():
                 print(f"VERIFY FAILED, {stage} missing or empty: {', '.join(names)}",
                       file=sys.stderr)
-            return 1
+                return 1
         total = sum(len(names) for names in STAGE_OUTPUTS.values())
         print(f"verify ok: {total} artefacts present")
+
+    # Only now, with every stage's outputs present, is it possible to consolidate the headline
+    # metrics. It is deliberately not a sixth stage: it has no module of its own to fail
+    # independently, and its job is to read what the other five produced. Doing it inside a
+    # stage would mean a half-finished run still writes a metrics file.
+    try:
+        from src import model_metrics
+        metrics_path = model_metrics.write()
+        print(f"metrics: {metrics_path.relative_to(config.ROOT)}")
+    except Exception as error:                              # noqa: BLE001
+        print(f"METRICS FAILED: {error}", file=sys.stderr)
+        return 1
 
     print(f"pipeline complete in {time.monotonic() - started:.1f}s")
     return 0

@@ -1,9 +1,10 @@
 # RetailPulse — full-stack image for the NIGHTLY PIPELINE.
 #
-# Deliberately separate from the dashboard `Dockerfile`. That image installs
-# requirements-dashboard.txt (streamlit, pandas, plotly) because the app only reads committed
-# aggregates from data/processed/ and never imports a model. Baking Prophet, TensorFlow and
-# XGBoost into it would be ~2 GB for a page that plots four CSVs.
+# Deliberately separate from the dashboard `Dockerfile`. That image installs the root
+# requirements.txt (streamlit, pandas, numpy) because the app only reads committed aggregates
+# from data/processed/ and never imports a model. Baking Prophet, TensorFlow and XGBoost into
+# it would be ~2 GB for a page that plots four CSVs. The same split is why Streamlit Community
+# Cloud can install three packages instead of the whole toolchain.
 #
 # The pipeline is the opposite case: every stage fits a model, so it needs the full dependency
 # set. Pointing the pipeline CronJob at the dashboard image was a real defect -- each stage died
@@ -37,12 +38,16 @@ RUN apt-get update \
 WORKDIR /app
 
 # --------------------------------------------------------------------------- dependencies
+# The full modelling stack. NOT requirements.txt: that file is the lean app set, because it is
+# what Streamlit Community Cloud installs for the public demo, and it has no place in the image
+# that refits Prophet and trains the LSTM nightly.
 COPY requirements.txt ./
+COPY requirements-ml.txt ./
 
 # Prophet first and on its own: it is the slowest and the most fragile install, so a failure
 # surfaces here rather than after a multi-minute TensorFlow download.
 RUN pip install --no-cache-dir "prophet>=1.1.5" \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements-ml.txt
 
 # ------------------------------------------------------------------------------- app
 # The pipeline imports src.* and runs src.pipeline, which subprocesses `python -m src.<stage>`,

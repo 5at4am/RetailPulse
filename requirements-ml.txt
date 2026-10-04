@@ -1,0 +1,47 @@
+# RetailPulse -- modelling stack. Installs the app requirements plus everything the pipeline,
+# the tests and the report figures need.
+#
+#     pip install -r requirements-ml.txt
+#
+# This is NOT the file Streamlit Community Cloud reads. Cloud reads the root
+# `requirements.txt`, which is deliberately lean, because the public demo has to serve pages
+# from committed aggregates and never imports a model. Putting Prophet and TensorFlow in the
+# root file made a ~2.5 GB install the price of opening the deliverable worth 30% of the
+# grade.
+#
+# Ranges, not exact pins, for the reason in risk R1: local runs Python 3.14 / pandas 3.0 while
+# Cloud runs the version in `.python-version`. An exact pin fails to resolve on one of them.
+
+-r requirements.txt
+
+# --- analysis --------------------------------------------------------------
+scikit-learn>=1.5
+plotly>=5.22
+matplotlib>=3.8           # src/figures.py draws the six report figures
+
+# --- F-03 forecasting ------------------------------------------------------
+# Prophet on category aggregates, LSTM on the same window.
+# Prophet needs cmdstanpy -> a compiled Stan toolchain, which is a common install failure on
+# Windows and on Cloud. If it will not resolve, F-03 falls back to the statsmodels
+# trend/seasonal baseline, which is implemented separately, and the report states the
+# substitution.
+prophet>=1.1.5
+tensorflow>=2.16          # LSTM; pulls in keras
+
+# --- F-04 churn ------------------------------------------------------------
+xgboost>=2.1
+shap>=0.45
+
+# --- quality / drift -------------------------------------------------------
+evidently>=0.5
+
+# --- notebooks + reporting -------------------------------------------------
+jupyter>=1.0
+nbformat>=5.10
+
+# --- testing ---------------------------------------------------------------
+pytest>=8.0
+
+# To see exactly what resolved on your machine:
+#     python -m pip freeze > requirements.lock.txt
+# and commit that beside this file.

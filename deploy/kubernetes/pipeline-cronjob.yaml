@@ -61,11 +61,11 @@ spec:
             fsGroup: 10001
           containers:
             - name: pipeline
-              # NOT retailpulse:1.0.0. That tag is the dashboard image, built from
-              # requirements-dashboard.txt, which deliberately omits Prophet, TensorFlow,
-              # XGBoost and LightGBM -- the app reads committed aggregates and never imports
-              # them. Pointing the pipeline at that tag makes every stage fail on import.
-              # This is the full-stack image built from requirements.txt.
+              # NOT retailpulse:1.0.0. That tag is the dashboard image, built from the root
+              # requirements.txt, which omits Prophet, TensorFlow and XGBoost -- the app reads
+              # committed aggregates and never imports them. Pointing the pipeline at that tag
+              # makes every stage fail on import. This is the full-stack image, built from
+              # requirements-ml.txt.
               image: retailpulse-pipeline:1.0.0
               command: ["python", "-m", "src.pipeline"]
               env:

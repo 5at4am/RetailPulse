@@ -43,7 +43,10 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements.txt
+        # requirements-ml.txt, not the root requirements.txt: this job runs the whole non-slow
+        # suite, and the tests for F-03/F-04 import Prophet, XGBoost, SHAP and Evidently. The
+        # root file is the lean app set so Streamlit Community Cloud can install three packages.
+        run: pip install -r requirements-ml.txt
 
       - name: Aggregates are present and non-empty
         # This is the check that would have caught the missing segment-name column: the file
@@ -77,6 +80,14 @@ jobs:
           print(f"all {len(required)} committed aggregates carry their expected columns")
           PY
 
+      - name: Generate the raw inputs
+        # Seeded and gitignored, so a fresh CI checkout has no data/raw/ at all. Without this
+        # step the suite below fails in ~60 places with FileNotFoundError -- all of them real
+        # failures of the checkout, none of them failures of the code. Verified by cloning the
+        # repo to a clean directory and running the suite: it goes from 441 passed / 60 failed
+        # to fully green in the 8 seconds this generator takes.
+        run: python generate_retail_pulse.py
+
       - name: Unit tests excluding slow
         run: python -m pytest tests/ -q -m "not slow"
 
@@ -96,7 +107,8 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements.txt
+        # Full stack: this job regenerates the raw data and refits every model.
+        run: pip install -r requirements-ml.txt
 
       - name: Regenerate the raw data
         # Seeded, so this is reproducible. Without it the job cannot test ingestion, because
@@ -150,7 +162,9 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements-dashboard.txt pytest
+        # The root requirements.txt on purpose. This job must prove the app runs on exactly what
+        # Streamlit Community Cloud will install, so it must not quietly pull in the ML stack.
+        run: pip install -r requirements.txt pytest
 
       - name: Dashboard tests and load budget
         # AppTest runs every page without starting a server, and the load assertion is the

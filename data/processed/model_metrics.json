@@ -1,0 +1,162 @@
+{
+  "project": "RetailPulse",
+  "written_by": "src.pipeline.collect_model_metrics",
+  "note": "Consolidated after the stages, not in precompute.py as design spec section 4.2 states: precompute runs first and has no access to model outputs. Numbers are copied, never recomputed, so this file cannot disagree with the CSVs it reads.",
+  "source_files": [
+    "churn_metrics.csv",
+    "forecast_backtest.csv",
+    "forecast_model_selection.csv",
+    "inventory_backtest_summary.csv",
+    "segment_summary.csv"
+  ],
+  "forecasting": {
+    "1": {
+      "selected_model": "prophet",
+      "wape": 0.006829,
+      "mape_nonzero": 0.006829,
+      "mae_units": 61.021285,
+      "rmse_units": 61.021285,
+      "mase": 0.10563,
+      "bias_units": 61.021285,
+      "candidates": {
+        "seasonal_naive": 0.021041,
+        "ridge_seasonal": 0.055511,
+        "ensemble_naive_prophet": 0.007106,
+        "prophet": 0.006829,
+        "lstm": 0.059988
+      }
+    },
+    "2": {
+      "selected_model": "seasonal_naive",
+      "wape": 0.021336,
+      "mape_nonzero": 0.021352,
+      "mae_units": 181.0,
+      "rmse_units": 181.135309,
+      "mase": 0.309,
+      "bias_units": -7.0,
+      "candidates": {
+        "seasonal_naive": 0.021336,
+        "ridge_seasonal": 0.035383,
+        "ensemble_naive_prophet": 0.03693,
+        "prophet": 0.073035,
+        "lstm": 0.11305
+      }
+    },
+    "4": {
+      "selected_model": "seasonal_naive",
+      "wape": 0.038349,
+      "mape_nonzero": 0.035871,
+      "mae_units": 332.75,
+      "rmse_units": 456.581044,
+      "mase": 0.564003,
+      "bias_units": 238.75,
+      "candidates": {
+        "seasonal_naive": 0.038349,
+        "ridge_seasonal": 0.038592,
+        "ensemble_naive_prophet": 0.067545,
+        "prophet": 0.112415,
+        "lstm": 0.241546
+      }
+    }
+  },
+  "churn": {
+    "auc_roc": 0.7315,
+    "target_auc_roc": 0.88,
+    "meets_auc_target": false,
+    "pr_auc": 0.6845,
+    "f1_at_operating_threshold": 0.4941,
+    "operating_threshold": 0.705187,
+    "precision_at_top_20pct": 0.7703,
+    "target_precision_at_top_20pct": 0.75,
+    "meets_precision_target": true,
+    "recall_at_top": 0.3628,
+    "lift_at_top": 1.8137,
+    "train_rows": 40588,
+    "test_rows": 21659,
+    "train_base_rate": 0.4317,
+    "test_base_rate": 0.4247,
+    "confusion_matrix": {
+      "true_negative": 11458,
+      "false_positive": 1002,
+      "false_negative": 5852,
+      "true_positive": 3347
+    }
+  },
+  "inventory": {
+    "baseline": "naive_mean",
+    "holdout_weeks": 13,
+    "baseline_error_units": 20700.5,
+    "policy_error_units": 20267.8,
+    "error_reduction_pct": 2.09,
+    "target_error_reduction_pct": [
+      25.0,
+      40.0
+    ],
+    "meets_target": false,
+    "baseline_overstock_units": 18301.9,
+    "policy_overstock_units": 44.0,
+    "baseline_understock_units": 2398.7,
+    "policy_understock_units": 20223.8,
+    "note": "Reduction is measured against the naive-mean policy on the same forecast. It is a walk-forward replay on historical data, not a production A/B result."
+  },
+  "segmentation": {
+    "n_segments": 6,
+    "n_customers": 8000,
+    "segments": [
+      {
+        "segment": "Champions",
+        "customers": 2020,
+        "revenue": 83739221.68,
+        "median_recency_days": 32.0,
+        "median_frequency": 14.0,
+        "median_basket_value": 2626.1125,
+        "online_share": 0.083022
+      },
+      {
+        "segment": "At risk loyal",
+        "customers": 774,
+        "revenue": 59650576.27,
+        "median_recency_days": 105.0,
+        "median_frequency": 4.0,
+        "median_basket_value": 17011.677778,
+        "online_share": 0.144121
+      },
+      {
+        "segment": "At risk (in-store, monetary high)",
+        "customers": 2536,
+        "revenue": 26889981.06,
+        "median_recency_days": 66.0,
+        "median_frequency": 4.0,
+        "median_basket_value": 1876.141667,
+        "online_share": 0.012784
+      },
+      {
+        "segment": "Occasional buyers",
+        "customers": 1289,
+        "revenue": 23810032.05,
+        "median_recency_days": 56.0,
+        "median_frequency": 7.0,
+        "median_basket_value": 2281.294286,
+        "online_share": 0.67878
+      },
+      {
+        "segment": "Dormant",
+        "customers": 839,
+        "revenue": 9665064.73,
+        "median_recency_days": 524.0,
+        "median_frequency": 2.0,
+        "median_basket_value": 3045.85,
+        "online_share": 0.108453
+      },
+      {
+        "segment": "At risk (promo-driven, monetary highest)",
+        "customers": 542,
+        "revenue": 6487748.56,
+        "median_recency_days": 88.5,
+        "median_frequency": 3.0,
+        "median_basket_value": 2223.869643,
+        "online_share": 0.121427
+      }
+    ]
+  }
+}

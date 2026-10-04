@@ -8,7 +8,9 @@ Times are local. Every entry records what was **run**, not what was intended.
 
 ---
 
-## Day 1 — Project setup, dataset verification, pipeline skeleton
+## Day 1 — 2026-10-04 (morning)
+
+**Goal:** project setup, dataset verification, pipeline skeleton
 
 ### Goal
 Get the whole project into one folder with a verified, reproducible data foundation, so
@@ -329,7 +331,9 @@ no model could reach. Base rate moved to ~40%, like the real snapshots.
 - `src/inventory.py` — reorder quantities off the 1-week horizon at a 95% service level.
 ---
 
-## 2026-10-04 17:32 — F-03 forecasting and F-05 inventory
+## Day 2 — 2026-10-04 (afternoon)
+
+### F-03 forecasting and F-05 inventory
 
 ### F-03 forecasting (`src/forecasting.py`)
 
@@ -450,7 +454,9 @@ data).
 - Drift/quality artifacts and the final report, then README and video outline.
 ---
 
-## 2026-10-04 — F-06 dashboard, F-07 drift, report and README
+## Day 3 — 2026-10-04 (evening)
+
+### F-06 dashboard, F-07 drift, report and README
 
 ### F-06 dashboard
 
@@ -549,7 +555,9 @@ silencing the category, so a DeprecationWarning from our own code still fails th
 
 - Live Streamlit Cloud deployment needs the participant's own accounts; not done here.
 
-## 2026-10-04 (late) - Audit pass: Tier-3 correctness and honest numbers
+## Day 4 — 2026-10-05
+
+### Audit pass: Tier-3 correctness and honest numbers
 
 ### The CronJob did not sequence anything
 
@@ -717,3 +725,64 @@ no verification.
 
 - Live deployment, remote push and the participant's git identity still need real credentials.
 - Final prose needs participant review; the brief disqualifies AI-generated submissions.
+
+### Deploy readiness
+
+**Bug:** Streamlit Community Cloud refused the deploy with "the app's code is not connected to
+a remote GitHub repository". That message points at git, and the root cause was git plus two
+things only visible by reading what Cloud actually installs.
+
+**Root cause 1 — no remote.** Expected, and needs the participant's account. Everything else
+below had to be true before a push would have produced a working URL rather than a failed build.
+
+**Root cause 2 — the root `requirements.txt` was the wrong file for Cloud.** Cloud reads the
+root `requirements.txt` and offers no way to point it elsewhere. That file held Prophet,
+TensorFlow, XGBoost, SHAP and Evidently, so the public demo — worth 30% of the grade — began
+every cold start with a ~2.5 GB install, including the compiled Stan toolchain Prophet needs,
+which is the single most common way a Cloud deploy dies. The lean set lived in
+`requirements-dashboard.txt`, which is reachable by the Dockerfile and by nothing else. So the
+split was inverted for Cloud's benefit: the root file is now the three-package app set, and the
+modelling stack moved to `requirements-ml.txt`, which extends it with `-r requirements.txt` so
+the two cannot drift. `tests/test_tier3.py` asserts both halves, and CI's dashboard job installs
+the root file on purpose so it proves the app runs on what Cloud will install.
+
+**Root cause 3 — no `.python-version`.** Cloud resolves 3.11-3.12; local runs 3.14, and 3.14
+code will not run there. Pinned to `3.11`.
+
+**Root cause 4 — every route rendered Home.** `streamlit run app/Home.py` served all five URLs
+as the same page, so four of the five graded dashboard pages were unreachable. The design spec
+puts the five page files flat in `app/`, but Streamlit only auto-discovers a `pages/`
+*directory* — it does not promote sibling `.py` files to pages. So `app/Home.py` now declares
+them explicitly with `st.navigation`, keeping the spec's layout. The same file keeps
+`render()` on a bare `render()` call when there is no server, because `AppTest.from_file` runs
+the script without one and would otherwise test the shell instead of the page.
+
+The screenshots exposed this rather than the tests, which is the point worth keeping. `st.Page`
+on an unregistered path does not 404 — Streamlit resolves it to Home. All five captures were
+valid PNGs, 200 kB each, no exception on the page, and they were byte-identical. Every
+per-file check passed. So `src/screenshots.py` now names one phrase from each page's own
+content and fails if it is absent, which catches one missing page as well as four. Verified by
+reverting the navigation: 1/5 usable, exit 1, with the specific unregistered route named.
+Restored: 5/5, five distinct SHA-256 digests.
+
+### A fresh clone is a real test
+
+Checked out to an empty directory and overlaid with the working tree, the suite failed in 60
+places with `FileNotFoundError`. None were code defects: `data/raw/` is gitignored by design, so
+a clean checkout has no inputs, and `tests/test_precompute.py` etc. have no skip guard. CI's
+`verify` job ran the same command and would have failed the same way. Fixed by generating the
+raw inputs in that job — 8 seconds, seeded — after which the clone runs 503 passed.
+
+Two smaller results from the same exercise. `tests/test_report_integrity.py` failed because
+the report's provenance table names three raw files that are gitignored; they are now
+allow-listed per-file with the command that recreates them, rather than waved through. And
+serving the clone on a second port and screenshotting it produced 5/5 usable with five distinct
+digests, which is the closest thing to a Cloud smoke test available without the credentials.
+
+### Verification
+
+    python -m pytest tests/ -q                     -> 508 passed, 2 warnings
+    fresh clone, `pytest -m "not slow"`           -> 503 passed, 7 deselected
+    python -m src.screenshots                     -> 5/5 usable, 5 distinct digests
+    navigation reverted, same command             -> 1/5 usable, exit 1
+    pandoc + Chrome print-to-pdf                  -> 11 pages, 560 KB, 6 images, 0 U+FFFD

@@ -11,6 +11,7 @@ looking at YAML: the order, the stop-at-first-failure rule, and the artefact con
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 
@@ -320,13 +321,39 @@ class TestImagesExistForEveryReferencedImage:
         from src import config
 
         text = (config.ROOT / "Dockerfile.pipeline").read_text(encoding="utf-8")
-        # Requirements must come from requirements.txt, NOT requirements-dashboard.txt. That
-        # inversion is exactly what made every stage fail on import.
-        assert "requirements.txt" in text
-        active = [ln for ln in text.splitlines()
-                  if ln.strip().startswith(("RUN", "COPY")) and not ln.strip().startswith("#")]
-        assert not any("requirements-dashboard.txt" in ln for ln in active), (
-            "the pipeline image must not use the dashboard's light dependency set"
+        # Requirements must come from requirements-ml.txt. The root requirements.txt is now the
+        # lean app set -- deliberately, because Streamlit Community Cloud installs it to serve
+        # the public demo -- so a pipeline image built from it would fail on the first Prophet
+        # import. That inversion is exactly what made every stage fail on import.
+        assert "requirements-ml.txt" in text
+        # Comments are stripped, because this file names the lean set by design in order to
+        # explain the split, and a substring search over raw text would read the explanation as
+        # the dependency. Line continuations are joined so that a `RUN ... \` + `&& pip install`
+        # pair is read as one instruction rather than two lines that each look incomplete.
+        active = []
+        for raw in text.splitlines():
+            line = raw.rstrip()
+            if line.lstrip().startswith("#") or not line.strip():
+                continue
+            if active and active[-1].endswith("\\"):
+                active[-1] = active[-1].rstrip("\\").rstrip() + " " + line.strip()
+            else:
+                active.append(line)
+        # Every requirements file any instruction actually installs from, read off the joined
+        # instruction lines. The separate `pip install "prophet>=..."` line is a deliberate
+        # speed-up, not a second dependency source, so it is ignored here.
+        sources = {
+            match
+            for line in active
+            for match in re.findall(r"-r\s+(requirements[\w.-]*\.txt)", line)
+        }
+        assert "requirements-ml.txt" in sources, (
+            f"the pipeline image must install the modelling dependency set; saw {sources}"
+        )
+        assert not any(
+            re.fullmatch(r"requirements\.txt", name) for name in sources
+        ), (
+            "the pipeline image must not install the lean app set as its dependency source"
         )
 
     def test_pipeline_image_carries_the_src_package_not_just_the_orchestrator(self):
@@ -370,15 +397,15 @@ class TestKubernetesManifestAgreesWithTheCode:
             )
 
     def test_manifest_does_not_use_the_dashboard_image_for_the_pipeline(self):
-        # requirements-dashboard.txt omits Prophet, TensorFlow and XGBoost, so a pipeline
+        # The root requirements.txt omits Prophet, TensorFlow and XGBoost, so a pipeline
         # container built from it fails on import at stage one.
         from src import config
         text = (config.ROOT / "deploy" / "kubernetes" / "pipeline-cronjob.yaml").read_text(
             encoding="utf-8")
-        # Only the requirement lines. This file NAMES prophet, tensorflow and xgboost in its
-        # comments precisely to explain that they are excluded, so a substring search over the
-        # whole file would fail on the explanation.
-        lines = (config.ROOT / "requirements-dashboard.txt").read_text(
+        # Only the requirement lines. requirements-ml.txt NAMES prophet, tensorflow and xgboost
+        # as real requirements, so this must be read from the app set -- and that file NAMES them
+        # in comments only to explain the exclusion, which is why comments are stripped.
+        lines = (config.ROOT / "requirements.txt").read_text(
             encoding="utf-8").lower().splitlines()
         pinned = [ln for ln in lines if ln.strip() and not ln.strip().startswith("#")]
         for heavy in ("prophet", "tensorflow", "xgboost", "lightgbm"):

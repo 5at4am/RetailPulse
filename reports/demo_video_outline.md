@@ -4,6 +4,18 @@ Target: **5 minutes.** One screen recording of the running dashboard, plus a voi
 track. Every number below is already in `reports/RetailPulse_Report.md`, so if one is wrong
 in the video the report is the thing to fix first.
 
+## If the live URL is down
+
+The spec names the video plus screenshots as the backup for a dead demo URL, so record with the
+
+eports/screenshots/ folder open in a second window. Those five PNGs are captured from a
+running server by python -m src.screenshots, and 	ests/test_screenshots.py fails the build
+if two of them are byte-identical or if a page shows another page's content.
+
+They are not a substitute for the live demo, and the video should say so where it shows them.
+A screenshot cannot demonstrate the load time or that the pages respond to a filter, which are
+two of the things a judge will want to see.
+
 ## Setup before recording
 
 ```bash
