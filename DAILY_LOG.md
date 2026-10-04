@@ -439,7 +439,7 @@ has no cost column: purchase cost 60% of retail, holding 25%/yr, lost margin 40%
     python -m pytest tests/ -q                      -> 229 passed in 164s
 
 Three tests initially failed and each was informative rather than cosmetic: a rounding step
-leaked 0.002 units of reconciliation error (removed — full precision now), a test assumed
+leaked 0.002 units of reconciliation error (removed it; full precision now), a test assumed
 critical ratio should scale with absolute price (it is scale-invariant; only the margin
 ratio matters), and a test assumed Poisson always orders less than normal (false on smooth
 data).
@@ -448,3 +448,104 @@ data).
 
 - `src/dashboard.py` — Streamlit app over `data/processed/`.
 - Drift/quality artifacts and the final report, then README and video outline.
+---
+
+## 2026-10-04 — F-06 dashboard, F-07 drift, report and README
+
+### F-06 dashboard
+
+Five Streamlit pages over `data/processed/` only: Home, Demand Forecasting, Customer
+Segments, Churn Risk, Inventory Recommendations. Streamlit 1.65.0, config pinned for a
+dark theme and localhost binding.
+
+Two runtime bugs came out of the first AppTest run and both were mine, not Streamlit's:
+
+- `Customer_Segments.py` passed a Series into a DataFrame alongside plain arrays. It carried
+  a customer-count index and pandas tried to align it against the 0..5 index of the other
+  columns. Arrays now.
+- `Demand_Forecasting.py` selected forecast columns after renaming, so the lookup used the
+  pre-rename name and raised `KeyError`. Selection happens before the rename now.
+
+### The segment naming bug
+
+The segment summary was a DataFrame indexed by segment name. `precompute` wrote every
+aggregate with `index=False`, so the name was dropped and `segment_summary.csv` held six
+anonymous rows. The page recovered a name by reading the row position and looking it up by
+`segment_id` — but the summary is sorted by revenue, so row order is not id order.
+
+All six labels on screen were wrong. Champions (2,020 customers, INR 83.7M, the largest
+earner) was displayed as "At risk (in-store, monetary high)", and Dormant was displayed as
+"At risk loyal".
+
+`precompute` now promotes the index to a real column before writing, so the join key travels
+with the data, and the page joins on that name. Three regression tests: the column exists,
+each row's name matches its own customer count and revenue, and the rendered name-to-count
+mapping equals the one derived from the per-customer file.
+
+This is the bug I would most expect a reviewer to catch by reading the screen and thinking
+the labels look wrong. It looked right.
+
+### Forecast chart
+
+The chart concatenated all three horizon paths. Their `weeks_ahead` labels repeat across
+horizons, so concat raised on a duplicate index. It plots the 4-week path alone now — one
+line, and not three nested horizons drawn as if they were rivals.
+
+### F-07 drift
+
+`src/drift.py` compares 2024 against 2025 on the weekly panel: PSI for numerical columns,
+total-variation distance for categorical ones, plus a category-mix table on shares. Result
+is no significant drift, which is what a seeded generator should produce; the test asserts it
+rather than assuming it.
+
+PSI is implemented in-module because the same number has to appear in the printed table, the
+CSV and the tests. It is validated against synthetic shifts before being pointed at real
+data: zero-inflation 20% → 60% reads 0.26, mean 1.0 → 1.5 reads 0.17, mean 1.0 → 5.0 reads
+3.79. One test pins that PSI is *not* symmetric under swapping arguments, since the bins come
+from the reference period — that is the definition, not a defect.
+
+Evidently took three attempts. `Report.save_html` does not exist on the 0.7 top-level API,
+and the HTML renderer lives at `evidently.legacy.report` with the preset at
+`evidently.legacy.metric_preset`. All paths are tried and the outcome printed.
+
+### Two test failures worth recording
+
+- `test_every_read_by_the_dashboard_lands_in_processed` passed alone and failed in the suite.
+  `st.cache_data` lives for the whole process, so the pages read nothing at all and the spy
+  saw an empty list. An audit that passes because it observed nothing is worse than no audit,
+  so the test now clears the cache and asserts reads actually happened.
+- `test_home_shows_the_promotion_finding_as_measured` asserted against `at.info` titles while
+  the numbers were rendered as markdown. It was checking an empty string. It now reads both.
+
+### Report, README, video outline
+
+`reports/RetailPulse_Report.md` states the three missed targets plainly: churn AUC 0.7315
+against 0.88; the panel-level MAPE target not demonstrated, because the pooled 0.0068 figure
+excludes zero-demand weeks by construction; silhouette 0.1998 meaning the segments overlap.
+`README.md` repeats them in the results section rather than burying them. The video outline
+instructs the presenter to say the AUC miss out loud.
+
+### Git
+
+Repository initialised on `main`, three commits. `.gitignore` keeps `data/raw/` out and
+commits the small aggregates the dashboard reads. The Evidently HTML bundle is 4 MB and
+regenerable, so it is ignored; its two CSV companions stay committed because the report quotes
+their numbers.
+
+### Verification
+
+    python -m src.forecasting                -> exit 0, h=1 prophet WAPE 0.006829
+    python -m src.inventory                  -> exit 0, 2,081 units / 496 pairs
+    python -m src.drift                      -> exit 0, verdict: stable
+    python -m src.dashboard_data             -> 21 aggregates in 0.09s (budget 8s)
+    python -m pytest tests/test_dashboard.py -> 44 passed
+    python -m pytest tests/test_drift.py     -> 29 passed
+    python -m pytest tests/ -q               -> 305 passed in 209s
+
+`pytest.ini` now names the numpy.core `DeprecationWarning` that evidently emits instead of
+silencing the category, so a DeprecationWarning from our own code still fails the suite.
+
+### Next
+
+- Live Streamlit Cloud deployment needs the participant's own accounts; not done here.
+- Nothing else outstanding. F-01 through F-07 are implemented, tested and committed.

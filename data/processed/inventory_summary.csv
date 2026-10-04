@@ -1,2 +1,2 @@
 pairs,pairs_to_reorder,total_units_to_order,total_order_value,mean_critical_ratio,z,lead_time_weeks,service_level,purchase_cost_ratio,holding_rate,lost_margin_ratio,safety_stock_method,normal_approx_units_to_order,normal_approx_pairs
-7500,496,2081.0,48771.07551923077,0.9928400954653939,2.449139210673116,1,0.95,0.6,0.25,0.4,poisson_quantile,7464.590122464184,1518
+7500,496,2081.0,48771.07551923077,0.9928400954653939,2.449139210673116,1,0.95,0.6,0.25,0.4,poisson_quantile,7464.594739278813,1518
