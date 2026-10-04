@@ -139,6 +139,43 @@ class TestFiguresReadTheLiveData:
         assert len(shap) == 10, "the report documents ten behavioural features"
 
 
+class TestTheSuiteDoesNotDirtyTheTree:
+    """Committed deliverables must survive a test run byte for byte.
+
+    A test that regenerates a committed binary makes `git status` permanently dirty. The
+    first reaction is to ignore `git status`, and then it stops being able to catch a real
+    change -- which is the one job it has.
+    """
+
+    COMMITTED = (
+        "drift/evidently_drift.html",
+        "RetailPulse_Report.pdf",
+    )
+
+    @pytest.mark.parametrize("relative", COMMITTED)
+    def test_committed_artefact_has_not_been_touched(self, relative):
+        import subprocess
+
+        path = config.REPORTS / relative
+        if not path.exists():
+            pytest.skip(f"{relative} not built yet")
+
+        dirty = subprocess.run(
+            # as_posix() because git wants forward slashes and str(Path) on Windows
+            # produces backslashes.
+            ["git", "status", "--porcelain", "--", path.relative_to(config.ROOT).as_posix()],
+            cwd=config.ROOT, capture_output=True, text=True, check=False,
+        )
+        if dirty.returncode != 0:
+            pytest.skip("not a git checkout")
+
+        assert dirty.stdout.strip() == "", (
+            f"{relative} differs from the committed copy:\n{dirty.stdout}\n"
+            f"something regenerated it. Give the writer an output directory instead of "
+            f"letting it overwrite the committed artefact."
+        )
+
+
 class TestPdf:
     def test_pdf_is_a_pdf(self):
         pdf = pdf_bytes()

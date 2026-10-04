@@ -678,9 +678,36 @@ entirely, because `\r` is a carriage return, so the table row silently read `| e
 Lesson recorded because it will recur: **do not round-trip UTF-8 through PowerShell 5.1 cmdlets**
 in this repo. Use the editor tools, which are encoding-safe.
 
+### A test that rewrote its own deliverable
+
+`tests/test_drift.py::test_main_exits_zero` called `drift.main()` with no output directory, so
+every `pytest` run regenerated `reports/drift/evidently_drift.html`. Evidently stamps each report
+with a fresh UUID, so the payload was byte-identical and the diff was 6 lines — but it was a 3.7 MB
+binary blob changing on every run.
+
+`git status` was permanently dirty. That is worse than it looks: a status you cannot get clean
+gets ignored, and then it cannot report a real change either.
+
+The neighbouring test already did this correctly with `tmp_path`, so the intent was never in
+question. Fixed by giving `run()` and `main()` an `out_dir` parameter defaulting to
+`config.REPORTS / "drift"`, so `python -m src.drift` behaves exactly as before.
+
+Added a guard rather than trusting the fix:
+- `test_main_does_not_touch_the_committed_bundle` compares mtimes of everything in
+  `reports/drift/` before and after `main()`.
+- `test_committed_artefact_has_not_been_touched` in `test_figures.py` shells out to
+  `git status --porcelain` for the Evidently bundle and the report PDF.
+
+Verified the guard by flipping byte 0 of the PDF from `0x25` to `0x41`: it failed with
+`something regenerated it`, and `test_pdf_is_a_pdf` failed independently. My first attempt at
+that check passed 18/18 — because `0x25` is `%`, which is already byte 0 of a PDF, so I had
+rewritten the file with the value it already had. A verification that cannot fail is the same as
+no verification.
+
 ### Verification
 
-- `python -m pytest tests/ -q` → **471 passed**, 2 warnings, both from `shap`'s own colormap code.
+- `python -m pytest tests/ -q` → **474 passed**, 2 warnings, both from `shap`'s own colormap code.
+- After a full suite run, `git status` is clean apart from the edits being worked on.
 - `python -m src.pipeline`'s artefact check → no stage missing an output.
 - `precompute`, `inventory`, `churn`, `drift` re-run against the fixed code.
 - Docker, `kubectl` and Airflow are unavailable here, so the manifests are statically and

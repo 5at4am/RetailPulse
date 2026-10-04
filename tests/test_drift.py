@@ -207,8 +207,29 @@ def test_evidently_report_is_written_or_explains_itself(tmp_path, panel):
     assert written.suffix == ".html"
 
 
-def test_main_exits_zero():
-    assert drift.main() == 0
+def test_main_exits_zero(tmp_path):
+    # tmp_path, not the default: `main()` writes the whole drift bundle, and Evidently
+    # stamps every report with a fresh UUID. Writing to reports/drift/ here meant every
+    # `pytest` run produced a 3.7 MB binary diff in `git status`, which trains you to
+    # ignore the one tool that would have caught it.
+    assert drift.main(out_dir=tmp_path) == 0
+    assert (tmp_path / "drift_summary.csv").exists()
+    assert (tmp_path / "category_mix_drift.csv").exists()
+
+
+def test_main_does_not_touch_the_committed_bundle(tmp_path):
+    """The regression guard for the above: `main()` must not write to reports/drift/."""
+    committed = config.REPORTS / "drift"
+    before = {p.name: (p.stat().st_mtime_ns, p.stat().st_size)
+              for p in committed.glob("*") if p.is_file()}
+    if not before:
+        pytest.skip("no committed drift bundle to compare against")
+
+    drift.main(out_dir=tmp_path)
+
+    after = {p.name: (p.stat().st_mtime_ns, p.stat().st_size)
+             for p in committed.glob("*") if p.is_file()}
+    assert after == before, f"reports/drift/ was modified: {before} -> {after}"
 
 
 def test_the_real_panel_shows_no_significant_drift(panel):

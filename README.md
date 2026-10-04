@@ -21,7 +21,7 @@ recommendations for a 970,998-line retail panel, plus a Streamlit dashboard.
 pip install -r requirements.txt
 python generate_retail_pulse.py     # raw data, seeded, not committed
 python -m src.precompute            # aggregates the dashboard reads
-python -m pytest tests/ -q          # 471 tests
+python -m pytest tests/ -q          # 474 tests
 ```
 
 ## Running the dashboard
@@ -88,7 +88,7 @@ app/            Streamlit pages + cached data loader
 data/processed/ committed aggregates (the dashboard's only input)
 data/raw/       generated, gitignored
 src/            one module per stage
-tests/          471 tests
+tests/          474 tests
 reports/        report, drift artefacts, figures
 DAILY_LOG.md    dated log of decisions and verification runs
 ```

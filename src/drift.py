@@ -241,14 +241,18 @@ def write_evidently_report(reference: pd.DataFrame, current: pd.DataFrame,
     return None
 
 
-def run(write: bool = True) -> dict:
+def run(write: bool = True, out_dir: Path | None = None) -> dict:
     panel = load_panel()
     reference, current = split_periods(panel)
     summary = build_summary(panel)
     mix = category_mix(panel)
 
     if write:
-        out_dir = config.REPORTS / "drift"
+        # out_dir exists so tests can write to tmp_path. Without it every `pytest` run
+        # overwrote the committed reports/drift/ bundle, because Evidently stamps each
+        # report with a fresh UUID. That left `git status` permanently dirty with a 3.7 MB
+        # binary diff, which is the surest way to teach someone to stop reading it.
+        out_dir = out_dir or (config.REPORTS / "drift")
         out_dir.mkdir(parents=True, exist_ok=True)
         summary.to_csv(out_dir / "drift_summary.csv", index=False)
         mix.to_csv(out_dir / "category_mix_drift.csv")
@@ -265,8 +269,8 @@ def run(write: bool = True) -> dict:
     }
 
 
-def main() -> int:
-    result = run()
+def main(out_dir: Path | None = None) -> int:
+    result = run(out_dir=out_dir)
     summary = result["summary"]
     mix = result["category_mix"]
 

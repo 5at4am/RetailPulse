@@ -145,7 +145,7 @@ The Evidently HTML report is at `reports/drift/evidently_drift.html`.
 
 Back to Home.
 
-> "Seven functional requirements, 471 tests, a dashboard that loads in about a tenth of a
+> "Seven functional requirements, 474 tests, a dashboard that loads in about a tenth of a
 > second because it reads precomputed aggregates and never the 103 MB of raw inputs."
 
 > "Four targets were missed, and they're in the report: churn AUC is 0.73 against 0.88, the

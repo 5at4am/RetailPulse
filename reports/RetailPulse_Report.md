@@ -3,7 +3,7 @@
 **Dataset:** `retail_sales.csv` + `store_product_matrix.csv` — 970,998 line items, 8,000
 customers, 1,200 products, 50 stores, 2024-01-01 to 2025-12-31 (104 complete weeks).
 **Stack:** Python 3.11+, pandas, scikit-learn, XGBoost, Prophet, TensorFlow/Keras, Evidently,
-Streamlit. **Tests:** 471 passing.
+Streamlit. **Tests:** 474 passing.
 
 ---
 
