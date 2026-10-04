@@ -391,6 +391,8 @@ def segment_customers(rfm, features=None, k=None, k_range=range(2, 11),
         "segment_names": segment_names,
         # No `total_units` here: `rfm_features` drops the units column to keep the feature
         # matrix clean, so a units aggregate would have to be faked from monetary.
+        # Indexed by segment name on purpose: `precompute` calls `.reset_index()` before
+        # writing, which turns the name into the join key the dashboard needs.
         "segment_summary": (out.groupby("segment")
                             .agg(customers=("customer_id", "count"),
                                  median_recency_days=("recency_days", "median"),

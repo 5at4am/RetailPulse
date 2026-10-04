@@ -297,7 +297,12 @@ def build_all(write=True, run_segmentation=True, segmentation=None):
         if segmentation is None:
             segmentation = segment_customers(
                 rfm_features(sales, as_of=config.SALES_END), run_dbscan=False)
-        out["segment_summary"] = segmentation["segment_summary"]
+        # `segment_summary` is indexed by the segment name. Written as-is with
+        # index=False that name is silently dropped, and the CSV becomes six anonymous rows
+        # that can only be re-identified by assuming row order matches `segment_id` -- which
+        # it does not, because this frame is sorted by revenue. Promote the index to a real
+        # column so the join key travels with the data.
+        out["segment_summary"] = segmentation["segment_summary"].reset_index()
         out["customer_segments"] = segmentation["customers"]
     out["_matrix"] = matrix
     out["_concentration"] = concentration_summary(distribution)

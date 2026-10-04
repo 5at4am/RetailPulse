@@ -40,6 +40,17 @@ def render():
     seg = segments()
     summ = summary()
 
+    # `summ` carries its own `segment` name column; join on it. Reading the name off
+    # `named.index` and looking it up in a segment_id map pairs each row with the wrong
+    # name, because the summary is sorted by revenue and segment_id is not.
+    required = {"segment"}
+    missing = required - set(summ.columns)
+    if missing:
+        raise KeyError(
+            f"segment_summary.csv is missing {sorted(missing)}. Regenerate the aggregates "
+            f"with `python -m src.precompute` so the segment name is written as a column.")
+    summ = summ.rename(columns={"segment": "name"}).set_index("name", drop=False)
+
     total_customers = len(seg)
     total_revenue = seg["monetary"].sum()
 
@@ -63,14 +74,12 @@ def render():
     left, right = st.columns([3, 2])
 
     with left:
-        labels = (seg.groupby("segment_id")["segment"].agg(lambda s: s.mode().iloc[0])
-                  .to_dict())
         # Per-customer revenue, as a plain array. Kept as a Series it would carry the
-        # customer-count index and pandas would try to align it against the 0..5 index of
+        # customer-count index and pandas would try to align it against the index of
         # every other column, which fails.
         revenue_per_head = (named["total_revenue"] / named["customers"]).to_numpy()
         display = pd.DataFrame({
-            "Segment": [labels.get(i, f"Segment {i}") for i in named.index],
+            "Segment": named["name"].to_numpy(),
             "Customers": named["customers"].to_numpy().astype(int),
             "% of customers": named["share_customers"].map(dd.pct).to_numpy(),
             "% of revenue": named["share_revenue"].map(dd.pct).to_numpy(),
@@ -85,7 +94,7 @@ def render():
     with right:
         st.subheader("Revenue vs customers")
         chart = pd.DataFrame({
-            "Segment": [labels.get(i, f"Segment {i}") for i in named.index],
+            "Segment": named["name"].to_numpy(),
             "% of customers": named["share_customers"] * 100,
             "% of revenue": named["share_revenue"] * 100,
         })

@@ -363,6 +363,55 @@ def test_segment_sizes_sum_to_the_customer_count():
     assert summary["customers"].sum() == len(segments)
 
 
+def test_segment_summary_carries_the_name_as_a_column():
+    """Regression: the name was the index, so `index=False` dropped it.
+
+    With six anonymous rows the only way to label them was to assume row order matched
+    `segment_id`. It does not -- the summary is sorted by revenue -- so every name on the
+    page was paired with the wrong segment. Champions, the largest earner, was displayed as
+    an at-risk group. The names must ship as data.
+    """
+    summary = dd.load("segment_summary.csv")
+    assert "segment" in summary.columns, (
+        "segment_summary.csv lost its segment names; rerun `python -m src.precompute`")
+    assert summary["segment"].notna().all()
+    # Every name must correspond to a real group in the per-customer file.
+    segments = dd.load("customer_segments.csv")
+    assert set(summary["segment"]) == set(segments["segment"].unique())
+
+
+def test_segment_summary_names_match_their_own_customer_counts():
+    """The name and the numbers in the same row must describe the same group."""
+    segments = dd.load("customer_segments.csv")
+    summary = dd.load("segment_summary.csv")
+
+    truth = segments.groupby("segment").agg(
+        customers=("customer_id", "count"), total_revenue=("monetary", "sum"))
+
+    merged = summary.set_index("segment").join(truth, rsuffix="_truth")
+    assert (merged["customers"] == merged["customers_truth"]).all(), (
+        "a row's name does not match its own customer count")
+    assert (merged["total_revenue"].round(2)
+            == merged["total_revenue_truth"].round(2)).all()
+
+
+def test_segments_page_names_each_row_from_the_summary_not_row_position():
+    """The displayed name must travel with its own numbers, whatever the sort order."""
+    segments = dd.load("customer_segments.csv")
+    summary = dd.load("segment_summary.csv")
+    at = run_page("app/Customer_Segments.py")
+    assert not at.exception
+
+    # Ground truth: name -> customer count, straight from the per-customer file.
+    truth = (segments.groupby("segment")["customer_id"].count().to_dict())
+    frame = at.dataframe[0].value if isinstance(at.dataframe[0].value, pd.DataFrame) \
+        else pd.DataFrame(at.dataframe[0].value)
+
+    displayed = dict(zip(frame["Segment"], frame["Customers"]))
+    assert displayed == truth, (
+        "the segment table pairs names with the wrong counts")
+
+
 # -------------------------------------------------------------------------------- misc
 
 def test_pages_do_not_leak_absolute_paths_into_user_text():
