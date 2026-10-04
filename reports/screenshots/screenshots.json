@@ -1,5 +1,5 @@
 {
-  "source_url": "http://localhost:8501",
+  "source_url": "http://localhost:8509",
   "viewport": {
     "width": 1440,
     "height": 2400
@@ -9,68 +9,68 @@
   "pages": [
     {
       "page": "Home",
-      "url": "http://localhost:8501/",
+      "url": "http://localhost:8509/",
       "file": "01_home.png",
       "caption": "KPI overview and the honest headline findings",
       "expected_text": "Weekly revenue",
       "saw_expected_text": true,
-      "bytes": 241467,
+      "bytes": 238997,
       "text_length": 2451,
       "ok": true,
       "problem": null,
-      "sha256": "ec56a7d056f1c7cd"
+      "sha256": "5b59a5d2a479718f"
     },
     {
       "page": "Demand_Forecasting",
-      "url": "http://localhost:8501/Demand_Forecasting",
+      "url": "http://localhost:8509/Demand_Forecasting",
       "file": "02_demand_forecasting.png",
       "caption": "F-03 backtest, model selection, forecast",
       "expected_text": "Model backtest",
       "saw_expected_text": true,
-      "bytes": 240117,
+      "bytes": 235004,
       "text_length": 2687,
       "ok": true,
       "problem": null,
-      "sha256": "520c39c61d155200"
+      "sha256": "67eb3b0d3bbd2fbf"
     },
     {
       "page": "Customer_Segments",
-      "url": "http://localhost:8501/Customer_Segments",
+      "url": "http://localhost:8509/Customer_Segments",
       "file": "03_customer_segments.png",
       "caption": "F-02 K-Means segmentation",
       "expected_text": "Revenue vs customers",
       "saw_expected_text": true,
-      "bytes": 213126,
+      "bytes": 206960,
       "text_length": 1768,
       "ok": true,
       "problem": null,
-      "sha256": "3d24581b55333b37"
+      "sha256": "d086459b032986df"
     },
     {
       "page": "Churn_Risk",
-      "url": "http://localhost:8501/Churn_Risk",
+      "url": "http://localhost:8509/Churn_Risk",
       "file": "04_churn_risk.png",
       "caption": "F-04 XGBoost scoring and SHAP",
       "expected_text": "AUC target missed",
       "saw_expected_text": true,
-      "bytes": 238997,
+      "bytes": 237937,
       "text_length": 2525,
       "ok": true,
       "problem": null,
-      "sha256": "38d0cbb57ec8e17a"
+      "sha256": "4d956052ba101f33"
     },
     {
       "page": "Inventory_Recommendations",
-      "url": "http://localhost:8501/Inventory_Recommendations",
+      "url": "http://localhost:8509/Inventory_Recommendations",
       "file": "05_inventory_recommendations.png",
       "caption": "F-05 reorder plan",
       "expected_text": "Why safety stock is a Poisson quantile",
       "saw_expected_text": true,
-      "bytes": 243574,
+      "bytes": 236273,
       "text_length": 3248,
       "ok": true,
       "problem": null,
-      "sha256": "a227137b1000a591"
+      "sha256": "3c0fc9a31bdc74ef"
     }
   ]
 }
